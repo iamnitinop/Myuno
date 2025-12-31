@@ -1,0 +1,28 @@
+# Common
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Backend (NestJS)
+backend/dist/
+backend/node_modules/
+backend/build/
+backend/coverage/
+backend/.nyc_output
+backend/generated/Prisma
+
+# Dashboard (Next.js)
+dashboard/.next/
+dashboard/node_modules/
+dashboard/out/
+dashboard/build/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace

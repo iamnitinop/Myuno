@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     Membership[]
+  stores    Store[]
+  campaigns Campaign[]
+  events    EventRaw[]
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  
+  accounts     Membership[]
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  accountId String
+  role      String   @default("member") // owner, admin, member
+
+  user      User     @relation(fields: [userId], references: [id])
+  account   Account  @relation(fields: [accountId], references: [id])
+
+  @@unique([userId, accountId])
+}
+
+model Store {
+  id        String   @id @default(uuid())
+  accountId String
+  domain    String   @unique
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  account   Account  @relation(fields: [accountId], references: [id])
+}
+
+model Campaign {
+  id           String   @id @default(uuid())
+  accountId    String
+  name         String
+  type         String   // top_bar, modal
+  status       String   @default("draft") // draft, published
+  creativeJson Json     // JSONB
+  rulesJson    Json     // JSONB
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  account      Account  @relation(fields: [accountId], references: [id])
+  snapshots    PublishSnapshot[]
+}
+
+model PublishSnapshot {
+  id          String   @id @default(uuid())
+  campaignId  String
+  version     String
+  payloadKey  String
+  payloadUrl  String
+  createdAt   DateTime @default(now())
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model EventRaw {
+  id         String   @id @default(uuid())
+  accountId  String
+  campaignId String?
+  type       String   // impression, click
+  url        String?
+  referrer   String?
+  ua         String?
+  meta       Json?
+  createdAt  DateTime @default(now())
+  
+  account    Account  @relation(fields: [accountId], references: [id])
+}
