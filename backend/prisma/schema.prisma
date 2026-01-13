@@ -89,3 +89,21 @@ model EventRaw {
   
   account    Account  @relation(fields: [accountId], references: [id])
 }
+
+model EmailCapture {
+  id         String   @id @default(uuid())
+  accountId  String
+  campaignId String?
+  email      String
+  phone      String?  // Optional for SMS capture
+  source     String?  // Which template/campaign captured this
+  userAgent  String?
+  ipAddress  String?
+  metadata   Json?    // Extra fields like name, preferences, etc.
+  createdAt  DateTime @default(now())
+  
+  @@index([accountId])
+  @@index([campaignId])
+  @@index([email])
+  @@index([createdAt])
+}

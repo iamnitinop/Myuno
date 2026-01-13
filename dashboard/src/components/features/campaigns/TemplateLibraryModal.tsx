@@ -1,0 +1,140 @@
+"use client";
+
+import { X } from "lucide-react";
+import { templateLibrary, TemplateInfo } from "@/lib/templates";
+import { useRouter } from "next/navigation";
+import { LS } from "@/lib/utils";
+import { AccountData } from "@/lib/types";
+import { defaultRules } from "@/lib/defaults";
+import Image from "next/image";
+
+interface TemplateLibraryModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v3`;
+
+export function TemplateLibraryModal({ isOpen, onClose }: TemplateLibraryModalProps) {
+    const router = useRouter();
+
+    if (!isOpen) return null;
+
+    const handleUseTemplate = (template: TemplateInfo) => {
+        const accountId = "ACC_DEMO_001";
+        const data: AccountData = LS.get(KEY_DATA(accountId), {
+            accountId,
+            banners: [],
+            rules: [],
+            events: [],
+        });
+
+        // Generate banner from template
+        const newBanner = template.generator();
+        const newRules = defaultRules(newBanner.id);
+
+        data.banners.push(newBanner);
+        data.rules.push(newRules);
+
+        LS.set(KEY_DATA(accountId), data);
+
+        // Navigate to editor
+        router.push(`/campaigns/${newBanner.id}`);
+        onClose();
+    };
+
+    const handlePreview = (template: TemplateInfo) => {
+        // For now, just use the template
+        // In future, could open a preview modal
+        handleUseTemplate(template);
+    };
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 bg-black/50 z-50"
+                onClick={onClose}
+            />
+
+            {/* Modal */}
+            <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+                        <h2 className="text-xl font-semibold">Template Library</h2>
+                        <button
+                            onClick={onClose}
+                            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* Templates Grid */}
+                    <div className="p-6 overflow-y-auto max-h-[calc(90vh-88px)]">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {templateLibrary.map((template) => (
+                                <div
+                                    key={template.id}
+                                    className="border-2 border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
+                                >
+                                    {/* Template Preview */}
+                                    <div className="bg-gray-100 dark:bg-gray-800 aspect-video relative flex items-center justify-center p-4">
+                                        {/* Mock preview - showing the template design */}
+                                        <div className="relative w-full h-full bg-white dark:bg-gray-900 rounded-lg shadow-lg flex">
+                                            {/* Yellow section */}
+                                            <div className="w-1/2 bg-[#F5C542] rounded-l-lg flex items-center justify-center p-4">
+                                                <div className="w-24 h-20 relative">
+                                                    <Image
+                                                        src="/assets/vintage-car.png"
+                                                        alt="Vintage Car"
+                                                        fill
+                                                        className="object-contain"
+                                                    />
+                                                </div>
+                                            </div>
+                                            {/* White section */}
+                                            <div className="w-1/2 p-4 flex flex-col items-center justify-center gap-2">
+                                                <div className="text-lg font-bold text-gray-800 dark:text-gray-200">Welcome</div>
+                                                <div className="text-[10px] text-gray-500 text-center">
+                                                    Sign up below for exclusive news & offers.
+                                                </div>
+                                                <div className="w-full h-5 bg-white dark:bg-gray-800 border border-gray-300 rounded mt-1"></div>
+                                                <div className="w-full h-5 bg-gray-800 dark:bg-gray-700 rounded"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Template Info */}
+                                    <div className="p-4">
+                                        <h3 className="font-semibold text-lg mb-1">{template.name}</h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                            {template.description}
+                                        </p>
+
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleUseTemplate(template)}
+                                                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                                            >
+                                                Use Template
+                                            </button>
+                                            <button
+                                                onClick={() => handlePreview(template)}
+                                                className="px-4 py-2 border-2 border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 font-medium rounded-lg transition-colors"
+                                            >
+                                                Preview
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+}

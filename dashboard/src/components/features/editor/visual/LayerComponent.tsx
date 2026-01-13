@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Rnd } from "react-rnd";
 import { Layer } from "@/lib/types";
 import { TimerLayer } from "./TimerLayer";
+import { EmailFormLayer } from "./EmailFormLayer";
 import { Move } from "lucide-react";
 
 export interface LayerComponentProps {
@@ -183,6 +184,8 @@ export function LayerComponent({
                     <img src={layer.content} alt="" className="w-full h-full object-cover pointer-events-none" />
                 ) : layer.type === "timer" ? (
                     <TimerLayer targetDate={layer.content} style={layer.style} timerDisplay={layer.metadata?.timerDisplay} boxColor={layer.metadata?.boxColor} labelColor={layer.metadata?.labelColor} padding={layer.metadata?.padding} minWidth={layer.metadata?.minWidth} gap={layer.metadata?.gap} borderRadius={layer.metadata?.borderRadius} />
+                ) : layer.type === "email_form" ? (
+                    <EmailFormLayer layer={layer} selected={isSelected} onSelect={() => onSelect(layer.id)} />
                 ) : (
                     <div className="flex items-center justify-center w-full h-full">
                         {layer.content}

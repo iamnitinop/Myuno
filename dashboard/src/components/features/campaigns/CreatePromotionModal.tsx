@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { uid, LS } from "@/lib/utils";
 import { defaultBanner, defaultRules } from "@/lib/defaults";
 import { AccountData, Banner } from "@/lib/types";
+import { TemplateLibraryModal } from "./TemplateLibraryModal";
+import { useState } from "react";
 
 interface CreatePromotionModalProps {
     isOpen: boolean;
@@ -15,6 +17,7 @@ const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v3`;
 
 export function CreatePromotionModal({ isOpen, onClose }: CreatePromotionModalProps) {
     const router = useRouter();
+    const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
 
     if (!isOpen) return null;
 
@@ -120,10 +123,10 @@ export function CreatePromotionModal({ isOpen, onClose }: CreatePromotionModalPr
 
                     {/* Options */}
                     <div className="p-6 space-y-3">
-                        {/* Template Library - Disabled */}
+                        {/* Template Library - Enabled */}
                         <button
-                            disabled
-                            className="w-full p-4 text-left rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 cursor-not-allowed opacity-60"
+                            onClick={() => setShowTemplateLibrary(true)}
+                            className="w-full p-4 text-left rounded-lg border-2 border-gray-200 dark:border-gray-800 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors"
                         >
                             <div className="flex items-start gap-3">
                                 <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
@@ -176,6 +179,12 @@ export function CreatePromotionModal({ isOpen, onClose }: CreatePromotionModalPr
                     </div>
                 </div>
             </div>
+
+            {/* Template Library Modal */}
+            <TemplateLibraryModal
+                isOpen={showTemplateLibrary}
+                onClose={() => setShowTemplateLibrary(false)}
+            />
         </>
     );
 }

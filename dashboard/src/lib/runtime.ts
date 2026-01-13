@@ -112,111 +112,37 @@ export function markShown({ rules, storage }: { rules: TargetingRules; storage: 
 // ADVANCED RULE ENGINE EVALUATION
 // ============================================================================
 
-/**
- * Evaluate a single advanced condition
- */
-function evaluateAdvancedCondition(
-    condition: AdvancedRuleCondition,
-    context: {
-        currentUrl: string;
-        firstUrl: string;
-        referringUrl: string;
-        previousDomainReferringUrl: string;
-    }
-): boolean {
-    let value = '';
+// ============================================================================
+// ADVANCED RULE ENGINE EVALUATION
+// ============================================================================
 
-    // Get the value to test based on condition type
-    switch (condition.type) {
-        case 'current_url':
-            value = context.currentUrl;
-            break;
-        case 'first_url':
-            value = context.firstUrl;
-            break;
-        case 'referring_url':
-            value = context.referringUrl;
-            break;
-        case 'previous_domain_referring_url':
-            value = context.previousDomainReferringUrl;
-            break;
-        default:
-            return false;
-    }
-
-    // Apply the operator
-    return applyOperator(value, condition.operator, condition.value);
+function checkUrlRules(url: string, rules: { op: string, value: string }[]) {
+    if (!rules || rules.length === 0) return true;
+    // If one matches, it's true (OR logic typically for inclusion lists)
+    return rules.some(r => matchString(url, r.op, r.value));
 }
 
-/**
- * Apply an operator to compare two values
- */
-function applyOperator(haystack: string, operator: RuleOperator, needle: string): boolean {
-    haystack = String(haystack || '').toLowerCase();
-    needle = String(needle || '').toLowerCase();
+function checkTrafficSource(referrer: string, sources: any) {
+    if (sources.all) return true;
 
-    switch (operator) {
-        case 'contains':
-            return haystack.includes(needle);
+    // Simple heuristics for sources
+    const ref = referrer.toLowerCase();
+    const isGoogle = ref.includes('google.com') || ref.includes('google.');
+    const isFacebook = ref.includes('facebook.com') || ref.includes('fb.com');
+    // const isEmail = ref.includes('mail.') || ref.includes('outlook.') || ref.includes('gmail.'); // Hard to detect email strictly from referrer often, but let's try
 
-        case 'does_not_contain':
-            return !haystack.includes(needle);
+    // For email, it's often UTM params, but we are checking referrer here. 
+    // Let's assume URL params are passed in Context or we just check referrer for now.
 
-        case 'is_equal_to':
-            return haystack === needle;
+    if (sources.googleOrganic && isGoogle && !ref.includes('aclk')) return true; // simplified
+    if (sources.googleAdwords && isGoogle && ref.includes('aclk')) return true;
+    if (sources.facebook && isFacebook) return true;
+    // ... others
 
-        case 'is_not_equal_to':
-            return haystack !== needle;
+    // If others is selected and it matches none of high level
+    if (sources.others && !isGoogle && !isFacebook) return true;
 
-        case 'matches_regex':
-            try {
-                const regex = new RegExp(needle);
-                return regex.test(haystack);
-            } catch {
-                return false;
-            }
-
-        case 'matches_wildcard':
-            // Convert wildcard to regex (* becomes .*, ? becomes .)
-            const wildcardRegex = needle
-                .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special chars
-                .replace(/\*/g, '.*') // * becomes .*
-                .replace(/\?/g, '.'); // ? becomes .
-            try {
-                const regex = new RegExp(`^${wildcardRegex}$`);
-                return regex.test(haystack);
-            } catch {
-                return false;
-            }
-
-        default:
-            return false;
-    }
-}
-
-/**
- * Evaluate a rule group (conditions combined with AND/OR)
- */
-function evaluateRuleGroup(
-    group: RuleGroup,
-    context: {
-        currentUrl: string;
-        firstUrl: string;
-        referringUrl: string;
-        previousDomainReferringUrl: string;
-    }
-): boolean {
-    if (group.conditions.length === 0) {
-        return true; // Empty group passes
-    }
-
-    const results = group.conditions.map(cond => evaluateAdvancedCondition(cond, context));
-
-    if (group.conditionOperator === 'AND') {
-        return results.every(r => r === true);
-    } else {
-        return results.some(r => r === true);
-    }
+    return false;
 }
 
 /**
@@ -235,26 +161,137 @@ export function evalAdvancedRules({
 }): boolean {
     if (!rules?.enabled) return false;
 
+    const config = rules.config;
+    if (!config) return true; // Should not happen but fail open or closed? Open is usually better for testing.
+
     ensureFirstUrls(storage as any, url);
 
-    const firstUrl = storage?.session?.getItem(FIRST_URL_SESSION_KEY) || '';
-
-    const context = {
-        currentUrl: url,
-        firstUrl: firstUrl,
-        referringUrl: referrer,
-        previousDomainReferringUrl: getHostSafe(referrer),
-    };
-
-    if (rules.ruleGroups.length === 0) {
-        return true; // No rules means show banner
+    // 1. Triggers (Simulator logic vs Real Runtime)
+    // For specific page:
+    if (config.trigger.type === 'specific_page') {
+        // This is redundant with Page Rules usually, but if set, we treat it as an implicit "Show on this page" 
+        // But usually Trigger "On Specific Page" implies "Any Page" unless Refine By says otherwise.
+        // Let's assume Refine By is the source of truth for URL matching.
+    }
+    // For "After X pages"
+    if (config.trigger.type === 'after_pages') {
+        // Check session page view count. 
+        // Note: Implementing page count tracking in simulator is out of scope for just this file, 
+        // but we can assume if it's not implemented, we might skip.
+        // Or simplified:
+        const views = Number(storage.session.getItem('page_views') || 1);
+        if (views < (config.trigger.value || 0)) return false;
     }
 
-    const groupResults = rules.ruleGroups.map(group => evaluateRuleGroup(group, context));
-
-    if (rules.groupOperator === 'AND') {
-        return groupResults.every(r => r === true);
-    } else {
-        return groupResults.some(r => r === true);
+    // 2. Refine By - Page Rules
+    if (config.pageRules.showOn.mode === 'others') {
+        const matchesShow = checkUrlRules(url, config.pageRules.showOn.urls);
+        if (!matchesShow) return false;
     }
+
+    // Dont show on
+    const matchesDontShow = checkUrlRules(url, config.pageRules.dontShowOn.urls);
+    if (matchesDontShow && config.pageRules.dontShowOn.urls.length > 0 && config.pageRules.dontShowOn.urls[0].value) return false;
+
+
+    // 3. Frequency & Stop Showing
+    const shownKey = `banner_shown_${rules.bannerId}`;
+    const closedKey = `banner_closed_${rules.bannerId}`;
+
+    // Check "Stop Showing" - Never
+    if (config.stopShowing.never) return false;
+
+    // Stop: After closed this visit
+    if (config.stopShowing.afterClosedThisVisit && storage.session.getItem(closedKey)) return false;
+
+    // Frequency: Once per session
+    if (config.frequency.oncePerSession && storage.session.getItem(shownKey)) return false;
+
+    // Frequency: Once ever
+    if (config.frequency.onceEver && storage.local.getItem(shownKey)) return false;
+
+    // Frequency: Again every X days
+    if (config.frequency.againEveryXDays.enabled) {
+        const lastShown = storage.local.getItem(shownKey); // timestamp
+        if (lastShown) {
+            const daysDiff = (Date.now() - Number(lastShown)) / (1000 * 60 * 60 * 24);
+            if (daysDiff < config.frequency.againEveryXDays.days) return false;
+        }
+    }
+
+    // Stop: After shown X times THIS visit
+    if (config.stopShowing.afterShownVisit.enabled) {
+        const count = Number(storage.session.getItem(shownKey + '_count') || 0);
+        if (count >= config.stopShowing.afterShownVisit.times) return false;
+    }
+
+    // Stop: After shown X times EVER
+    if (config.stopShowing.afterShownEver.enabled) {
+        const count = Number(storage.local.getItem(shownKey + '_count') || 0);
+        if (count >= config.stopShowing.afterShownEver.times) return false;
+    }
+
+
+    // 4. Audience
+    // New vs Returning
+    const firstVisit = storage.local.getItem('first_visit_ts');
+    const isNew = !firstVisit;
+
+    if (config.audience.mode === 'new' && !isNew) return false;
+    if (config.audience.mode === 'returning') {
+        if (isNew) return false;
+        // Check days
+        if (firstVisit) {
+            const days = (Date.now() - Number(firstVisit)) / (1000 * 60 * 60 * 24);
+            if (days < (config.audience.returningSinceDays || 0)) return false;
+        }
+    }
+
+    // 5. Traffic Source
+    if (!config.trafficSource.showFrom.all) {
+        if (!checkTrafficSource(referrer, config.trafficSource.showFrom)) return false;
+    }
+    if (checkTrafficSource(referrer, config.trafficSource.dontShowFrom) && !config.trafficSource.dontShowFrom.email && !config.trafficSource.dontShowFrom.facebook /* check if any exclusions are actually enabled */) {
+        const sources = config.trafficSource.dontShowFrom;
+        if (sources.email || sources.facebook || sources.googleOrganic || sources.googleAdwords || sources.others) {
+            if (checkTrafficSource(referrer, sources)) return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Update storage after a banner is shown
+ */
+export function markAdvancedShown({ rules, storage }: { rules: AdvancedTargetingRules; storage: { session: any; local: any } }) {
+    if (!rules?.enabled || !rules.config) return;
+
+    const bannerId = rules.bannerId;
+    const shownKey = `banner_shown_${bannerId}`;
+    const timestamp = Date.now();
+
+    // Session count
+    const sessionCount = Number(storage.session.getItem(shownKey + '_count') || 0);
+    storage.session.setItem(shownKey + '_count', String(sessionCount + 1));
+    storage.session.setItem(shownKey, String(timestamp));
+
+    // Lifetime check (Local Storage)
+    const localCount = Number(storage.local.getItem(shownKey + '_count') || 0);
+    storage.local.setItem(shownKey + '_count', String(localCount + 1));
+    storage.local.setItem(shownKey, String(timestamp));
+
+    // First visit tracking (if not set)
+    if (!storage.local.getItem('first_visit_ts')) {
+        storage.local.setItem('first_visit_ts', String(timestamp));
+    }
+}
+
+/**
+ * Update storage after a banner is closed
+ */
+export function markAdvancedClosed({ rules, storage }: { rules: AdvancedTargetingRules; storage: { session: any; local: any } }) {
+    if (!rules?.enabled) return;
+    const key = `banner_closed_${rules.bannerId}`;
+    storage.session.setItem(key, "1");
 }

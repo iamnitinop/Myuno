@@ -21,6 +21,7 @@ interface PropertiesPanelProps {
     selectedLayer: Layer | null;
     onChange: (id: string, patch: Partial<Layer>) => void;
     onDelete: (id: string) => void;
+    onDuplicate: (id: string) => void;
     canvasSettings: {
         width?: number;
         height: number;
@@ -41,6 +42,7 @@ export function PropertiesPanel({
     selectedLayer,
     onChange,
     onDelete,
+    onDuplicate,
     canvasSettings,
     onCanvasChange,
 }: PropertiesPanelProps) {
@@ -431,9 +433,14 @@ export function PropertiesPanel({
                     <div className="space-y-4">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-bold capitalize">{selectedLayer.type} Layer</span>
-                            <Button kind="danger" onClick={() => onDelete(selectedLayer.id)} className="text-xs px-2 py-1 h-auto flex items-center gap-1">
-                                <Trash2 className="w-3 h-3" /> Delete
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button kind="secondary" onClick={() => onDuplicate(selectedLayer.id)} className="text-xs px-2 py-1 h-auto flex items-center gap-1">
+                                    <span className="text-sm">❐</span> Duplicate
+                                </Button>
+                                <Button kind="danger" onClick={() => onDelete(selectedLayer.id)} className="text-xs px-2 py-1 h-auto flex items-center gap-1">
+                                    <Trash2 className="w-3 h-3" /> Delete
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Content */}
@@ -625,15 +632,20 @@ export function PropertiesPanel({
                                 value={String(selectedLayer.style.borderRadius || "0px")}
                                 onChange={(e) => updateStyle({ borderRadius: e.target.value })}
                             />
-                            <Input
-                                label="Opacity"
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                max="1"
-                                value={String(selectedLayer.style.opacity ?? 1)}
-                                onChange={(e) => updateStyle({ opacity: Number(e.target.value) })}
-                            />
+                            <div className="space-y-1 col-span-2">
+                                <div className="flex justify-between">
+                                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Opacity</label>
+                                    <span className="text-xs text-gray-500">{Math.round(Number(selectedLayer.style.opacity ?? 1) * 100)}%</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                                    value={Number(selectedLayer.style.opacity ?? 1) * 100}
+                                    onChange={(e) => updateStyle({ opacity: Number(e.target.value) / 100 })}
+                                />
+                            </div>
                         </div>
                     </div>
                 </AccordionItem >

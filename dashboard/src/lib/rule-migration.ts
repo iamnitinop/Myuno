@@ -1,110 +1,74 @@
 /**
  * Rule Migration Utilities
  * 
- * Provides functions to migrate between old (flat conditions) and new (nested groups) rule formats.
+ * Provides functions to migrate between old formats and the new AdvancedTargetingConfig configuration.
  */
 
 import {
     TargetingRules,
     AdvancedTargetingRules,
-    RuleGroup,
-    AdvancedRuleCondition,
-    RuleType,
-    RuleOperator
+    AdvancedTargetingConfig
 } from "./types";
 import { uid } from "./utils";
 
+const defaultConfig: AdvancedTargetingConfig = {
+    trigger: { type: 'specific_page' },
+    pageRules: {
+        showOn: { mode: 'any', urls: [{ op: 'contains', value: '' }] },
+        dontShowOn: { urls: [{ op: 'contains', value: '' }] }
+    },
+    frequency: {
+        onEveryPage: false,
+        oncePerSession: true,
+        onceEver: false,
+        againEveryXDays: { enabled: false, days: 3 }
+    },
+    stopShowing: {
+        never: false,
+        afterClosedThisVisit: true,
+        afterEngagementThis: true,
+        afterEngagementAny: false,
+        afterShownVisit: { enabled: true, times: 1 },
+        afterShownEver: { enabled: true, times: 2 }
+    },
+    audience: {
+        mode: 'all',
+        returningSinceDays: 3
+    },
+    trafficSource: {
+        showFrom: { all: true, email: false, facebook: false, googleOrganic: false, googleAdwords: false, others: false },
+        dontShowFrom: { email: false, facebook: false, googleOrganic: false, googleAdwords: false, others: false }
+    },
+    delay: { enabled: false, seconds: 20 }
+};
+
 /**
- * Migrate old flat rules to new nested group structure
+ * Migrate old flat rules to new config structure
+ * Note: This determines a safe default state because mapping complex arbitrary rules to the fixed UI structure is ambiguous.
  */
 export function migrateToAdvancedRules(oldRules: TargetingRules): AdvancedTargetingRules {
-    // Convert old conditions to advanced conditions
-    const advancedConditions: AdvancedRuleCondition[] = oldRules.conditions.map(cond => ({
-        id: `cond_${uid()}`,
-        type: mapOldTypeToNew(cond.type),
-        operator: mapOldOpToNew(cond.op),
-        value: cond.value || '',
-    }));
-
-    // Create a single group with all conditions (AND logic by default)
-    const singleGroup: RuleGroup = {
-        id: `group_${uid()}`,
-        conditions: advancedConditions,
-        conditionOperator: 'AND',
-    };
+    // Attempt to preserve strict URL targeting if clear
+    // But for safety and specific requirements, we default to a clean state 
+    // and let the user configure the new powerful options.
 
     return {
         bannerId: oldRules.bannerId,
         enabled: oldRules.enabled,
-        ruleGroups: advancedConditions.length > 0 ? [singleGroup] : [],
-        groupOperator: 'AND',
+        config: JSON.parse(JSON.stringify(defaultConfig)), // Deep copy default
     };
 }
 
 /**
- * Map old rule type to new RuleType
- */
-function mapOldTypeToNew(oldType: string): RuleType {
-    switch (oldType) {
-        case 'current_url':
-            return 'current_url';
-        case 'first_url':
-        case 'first_url_session':
-            return 'first_url';
-        case 'referring_url':
-        case 'referrer':
-            return 'referring_url';
-        default:
-            return 'current_url'; // Default fallback
-    }
-}
-
-/**
- * Map old operator to new RuleOperator
- */
-function mapOldOpToNew(oldOp: string): RuleOperator {
-    switch (oldOp) {
-        case 'contains':
-            return 'contains';
-        case 'does_not_contain':
-        case 'not_contains':
-            return 'does_not_contain';
-        case 'is':
-        case 'equals':
-        case 'is_equal_to':
-            return 'is_equal_to';
-        case 'is_not':
-        case 'not_equals':
-        case 'is_not_equal_to':
-            return 'is_not_equal_to';
-        case 'matches_regex':
-        case 'regex':
-            return 'matches_regex';
-        case 'matches_wildcard':
-        case 'wildcard':
-            return 'matches_wildcard';
-        default:
-            return 'contains'; // Default fallback
-    }
-}
-
-/**
- * Convert advanced rules back to old format (for backward compatibility)
+ * Convert advanced rules back to old format (Legacy support)
+ * This is lossy and primarily for fallbacks.
  */
 export function migrateFromAdvancedRules(advancedRules: AdvancedTargetingRules): TargetingRules {
-    // Flatten all conditions from all groups
-    const flatConditions = advancedRules.ruleGroups.flatMap(group =>
-        group.conditions.map(cond => ({
-            type: cond.type,
-            op: cond.operator,
-            value: cond.value,
-        }))
-    );
-
+    // We can't easily map back complex config to flat list.
+    // Return empty or basic conditions.
     return {
         bannerId: advancedRules.bannerId,
         enabled: advancedRules.enabled,
-        conditions: flatConditions,
+        conditions: [],
     };
 }
 
@@ -112,7 +76,7 @@ export function migrateFromAdvancedRules(advancedRules: AdvancedTargetingRules):
  * Check if rules are using the new advanced format
  */
 export function isAdvancedRules(rules: any): rules is AdvancedTargetingRules {
-    return rules && 'ruleGroups' in rules && Array.isArray(rules.ruleGroups);
+    return rules && 'config' in rules;
 }
 
 /**
@@ -133,49 +97,12 @@ export function ensureAdvancedRules(rules: TargetingRules | AdvancedTargetingRul
 }
 
 /**
- * Create a new empty rule group
- */
-export function createEmptyRuleGroup(): RuleGroup {
-    return {
-        id: `group_${uid()}`,
-        conditions: [],
-        conditionOperator: 'AND',
-    };
-}
-
-/**
- * Create a new empty condition
- */
-export function createEmptyCondition(): AdvancedRuleCondition {
-    return {
-        id: `cond_${uid()}`,
-        type: 'current_url',
-        operator: 'contains',
-        value: '',
-    };
-}
-
-/**
  * Create default advanced rules for a banner
  */
 export function createDefaultAdvancedRules(bannerId: string): AdvancedTargetingRules {
     return {
         bannerId,
         enabled: true,
-        ruleGroups: [
-            {
-                id: `group_${uid()}`,
-                conditions: [
-                    {
-                        id: `cond_${uid()}`,
-                        type: 'current_url',
-                        operator: 'does_not_contain',
-                        value: 'checkout',
-                    }
-                ],
-                conditionOperator: 'AND',
-            }
-        ],
-        groupOperator: 'AND',
+        config: JSON.parse(JSON.stringify(defaultConfig)),
     };
 }

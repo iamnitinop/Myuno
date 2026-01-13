@@ -117,11 +117,84 @@ export interface RuleGroup {
 /**
  * Complete targeting rules with nested groups
  */
+export type TriggerType = 'specific_page' | 'after_pages' | 'exit_intent' | 'scroll_depth';
+
+export interface AdvancedTargetingConfig {
+    // Triggers
+    trigger: {
+        type: TriggerType;
+        value?: number; // for pages or scroll %
+    };
+
+    // Refine By - Page Rules
+    pageRules: {
+        showOn: {
+            mode: 'any' | 'others';
+            urls: { op: 'contains' | 'equals' | 'does_not_contain'; value: string }[];
+        };
+        dontShowOn: {
+            urls: { op: 'contains' | 'equals' | 'does_not_contain'; value: string }[];
+        };
+    };
+
+    // Refine By - Frequency
+    frequency: {
+        onEveryPage: boolean;
+        oncePerSession: boolean;
+        onceEver: boolean;
+        againEveryXDays: { enabled: boolean; days: number };
+    };
+
+    // Refine By - Stop Showing
+    stopShowing: {
+        never: boolean;
+        afterClosedThisVisit: boolean;
+        afterEngagementThis: boolean;
+        afterEngagementAny: boolean;
+        afterShownVisit: { enabled: boolean; times: number };
+        afterShownEver: { enabled: boolean; times: number };
+    };
+
+    // Choose Who
+    audience: {
+        mode: 'all' | 'new' | 'returning';
+        returningSinceDays?: number;
+    };
+
+    // Traffic Source
+    trafficSource: {
+        showFrom: {
+            all: boolean;
+            email: boolean;
+            facebook: boolean;
+            googleOrganic: boolean;
+            googleAdwords: boolean;
+            others: boolean;
+        };
+        dontShowFrom: {
+            email: boolean;
+            facebook: boolean;
+            googleOrganic: boolean;
+            googleAdwords: boolean;
+            others: boolean;
+        };
+    };
+
+    // Delay
+    delay: {
+        enabled: boolean;
+        seconds: number;
+    };
+}
+
+/**
+ * Complete targeting rules with nested groups
+ */
 export interface AdvancedTargetingRules {
     bannerId: string;
     enabled: boolean;
-    ruleGroups: RuleGroup[];
-    groupOperator: LogicalOperator;  // How to combine groups
+    config: AdvancedTargetingConfig; // The specific UI state
+    // We keep specific fields for runtime efficiency if needed, but config is the source of truth for this editor
 }
 
 export interface TargetingRules {

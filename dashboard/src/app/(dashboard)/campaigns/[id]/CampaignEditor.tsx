@@ -7,6 +7,7 @@ import { defaultBanner, defaultRules } from "@/lib/defaults";
 import { AccountData, Banner, TargetingRules, AdvancedTargetingRules } from "@/lib/types";
 import { VisualEditor } from "@/components/features/editor/visual/VisualEditor";
 import { RuleBuilder } from "@/components/features/rules";
+import { AdvancedTargetingBuilder } from "@/components/features/targeting/AdvancedTargetingBuilder";
 import { TargetingSimulator } from "@/components/features/targeting/TargetingSimulator";
 import { PublishSettings } from "@/components/features/publish/PublishSettings";
 import { Pill } from "@/components/ui/Pill";
@@ -65,6 +66,10 @@ export default function CampaignEditor({ campaignId }: { campaignId: string }) {
 
     const rawRules = data.rules.find((r) => r.bannerId === banner.id) || defaultRules(banner.id);
     const rules = ensureAdvancedRules(rawRules);
+
+    // Check if it's an email capture campaign (contains email form)
+    const isAdvancedTargeting = banner.views.desktop.layers.some(l => l.type === 'email_form') ||
+        banner.views.mobile.layers.some(l => l.type === 'email_form');
 
     // Auto-save (no toast)
     const autoSave = (next: AccountData) => {
@@ -199,14 +204,26 @@ export default function CampaignEditor({ campaignId }: { campaignId: string }) {
                     <VisualEditor banner={banner} onChange={updateBanner} />
                 ) : tab === "targeting" ? (
                     <div className="h-full overflow-y-auto p-6">
-                        <div className="grid gap-6 lg:grid-cols-2 max-w-7xl mx-auto">
-                            <Card title="Advanced Rule Builder">
-                                <RuleBuilder rules={rules} onChange={updateRules} />
-                            </Card>
-                            <Card title="Rule Simulator">
-                                <TargetingSimulator banner={banner} rules={rules} />
-                            </Card>
-                        </div>
+                        {isAdvancedTargeting ? (
+                            <div className="max-w-5xl mx-auto">
+                                <Card title="Advanced Targeting">
+                                    <AdvancedTargetingBuilder
+                                        banner={banner}
+                                        rules={rules as AdvancedTargetingRules}
+                                        onChange={updateRules}
+                                    />
+                                </Card>
+                            </div>
+                        ) : (
+                            <div className="grid gap-6 lg:grid-cols-2 max-w-7xl mx-auto">
+                                <Card title="Rule Builder">
+                                    <RuleBuilder rules={rawRules as TargetingRules} onChange={(r) => updateRules(ensureAdvancedRules(r))} />
+                                </Card>
+                                <Card title="Rule Simulator">
+                                    <TargetingSimulator banner={banner} rules={rules as AdvancedTargetingRules} />
+                                </Card>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="h-full overflow-y-auto p-6">

@@ -67,6 +67,51 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
         });
     };
 
+    // Clipboard
+    const [clipboard, setClipboard] = useState<Layer | null>(null);
+
+    const duplicateLayer = (id: string, offset = 10) => {
+        const layerToClone = viewConfig.layers.find(l => l.id === id);
+        if (!layerToClone) return;
+
+        const newLayer: Layer = {
+            ...layerToClone,
+            id: "l_" + uid(),
+            name: layerToClone.name + " (Copy)",
+            position: {
+                x: layerToClone.position.x + offset,
+                y: layerToClone.position.y + offset,
+            },
+        };
+
+        updateView({ layers: [...viewConfig.layers, newLayer] });
+        setSelectedLayerId(newLayer.id);
+    };
+
+    const copyLayer = () => {
+        if (selectedLayerId) {
+            const layer = viewConfig.layers.find(l => l.id === selectedLayerId);
+            if (layer) setClipboard(layer);
+        }
+    };
+
+    const pasteLayer = () => {
+        if (clipboard) {
+            // Create a duplicate of the clipboard item
+            const newLayer: Layer = {
+                ...clipboard,
+                id: "l_" + uid(),
+                name: clipboard.name + " (Copy)",
+                position: {
+                    x: clipboard.position.x + 20,
+                    y: clipboard.position.y + 20,
+                },
+            };
+            updateView({ layers: [...viewConfig.layers, newLayer] });
+            setSelectedLayerId(newLayer.id);
+        }
+    };
+
     // ... (keep keyboard shortcuts and other logic same, I'll use a larger replacement to be safe with context) 
 
     // Actually, I can't strip the logic. I need to keep it.
@@ -80,22 +125,38 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
     // Keyboard Shortcuts
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+            // Undo: Ctrl+Z
+            if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
                 e.preventDefault();
-                if (e.shiftKey) {
-                    redo();
-                } else {
-                    undo();
-                }
+                undo();
             }
-            if ((e.metaKey || e.ctrlKey) && e.key === "y") {
+            // Redo: Ctrl+Shift+Z or Ctrl+Y
+            if ((e.metaKey || e.ctrlKey) && ((e.key === "z" && e.shiftKey) || e.key === "y")) {
                 e.preventDefault();
                 redo();
+            }
+            // Copy: Ctrl+C
+            if ((e.metaKey || e.ctrlKey) && e.key === "c") {
+                // Don't intercept if user is editing text (e.g. contentEditable)
+                if (document.activeElement?.getAttribute('contenteditable') === 'true') return;
+                e.preventDefault();
+                copyLayer();
+            }
+            // Paste: Ctrl+V
+            if ((e.metaKey || e.ctrlKey) && e.key === "v") {
+                if (document.activeElement?.getAttribute('contenteditable') === 'true') return;
+                e.preventDefault();
+                pasteLayer();
+            }
+            // Duplicate: Ctrl+D
+            if ((e.metaKey || e.ctrlKey) && e.key === "d") {
+                e.preventDefault();
+                if (selectedLayerId) duplicateLayer(selectedLayerId);
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [history, future, viewConfig]); // Dependencies for closure
+    }, [history, future, viewConfig, clipboard, selectedLayerId]); // Dependencies for closure
 
     // Push to history before making changes
     const saveHistory = () => {
@@ -286,6 +347,7 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
                         selectedLayer={selectedLayer}
                         onChange={updateLayer}
                         onDelete={deleteLayer}
+                        onDuplicate={(id) => duplicateLayer(id)}
                         canvasSettings={{
                             height: viewConfig.height,
                             background: viewConfig.background,

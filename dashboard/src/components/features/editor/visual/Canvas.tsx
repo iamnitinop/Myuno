@@ -88,15 +88,7 @@ export function Canvas({
                     }
                 }}
                 style={{
-                    // Use individual background properties instead of shorthand to avoid conflicts
-                    backgroundColor: viewConfig.backgroundImage ? 'transparent' : viewConfig.background,
-                    backgroundImage: viewConfig.backgroundImage
-                        ? `url(${viewConfig.backgroundImage})`
-                        : (viewConfig.background.includes('gradient') ? viewConfig.background : undefined),
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
                     height: viewConfig.height,
-                    opacity: viewConfig.backgroundOpacity ?? 1,
                     // Border settings
                     borderTopWidth: viewConfig.borderWidth,
                     borderRightWidth: viewConfig.borderWidth,
@@ -109,6 +101,19 @@ export function Canvas({
                     padding: viewConfig.padding,
                 }}
             >
+                {/* Background Layer */}
+                <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                        backgroundColor: viewConfig.backgroundImage ? 'transparent' : viewConfig.background,
+                        backgroundImage: viewConfig.backgroundImage
+                            ? `url(${viewConfig.backgroundImage})`
+                            : (viewConfig.background.includes('gradient') ? viewConfig.background : undefined),
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        opacity: viewConfig.backgroundOpacity ?? 1,
+                    }}
+                />
                 {viewConfig.layers.filter(l => l.visible !== false).map((layer) => (
                     <LayerComponent
                         key={layer.id}
