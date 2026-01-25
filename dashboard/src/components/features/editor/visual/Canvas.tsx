@@ -43,7 +43,7 @@ export function Canvas({
 
     return (
         <div
-            className="relative shadow-lg border border-gray-200 dark:border-gray-800 transition-all bg-white"
+            className="relative shadow-lg border border-gray-200 dark:border-gray-800 transition-all bg-white mx-auto"
             style={{
                 width: viewConfig.width || "100%",
                 height: viewConfig.height,

@@ -12,6 +12,196 @@ import { Canvas } from "./Canvas";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { LayerListPanel } from "./LayerListPanel";
 
+// Helper: scalable number parsing
+const parseNum = (val: string | number | undefined) => {
+    if (typeof val === "number") return val;
+    if (!val) return 0;
+    return parseFloat(val.toString());
+};
+
+const getSmartResponsiveLayout = (baseLayers: Layer[], targetWidth: number, baseWidth: number, device: "tablet" | "mobile") => {
+    const isMobile = device === "mobile";
+    const scale = targetWidth / baseWidth;
+
+    // Separate special layers
+    const normalLayers = baseLayers.filter(l => l.type !== "close_button");
+    const closeButtons = baseLayers.filter(l => l.type === "close_button");
+
+    // Process normal layers
+    let processedLayers: Layer[] = [];
+
+    if (isMobile) {
+        // Mobile: Stack layout
+        // Sort by visual reading order (Top-to-Bottom, then Left-to-Right)
+        // We group items that are roughly on the same Y-level (within 30px) to preserve some row structure if needed,
+        // but for pure stacking, we just want to sequentialize them.
+        const sorted = [...normalLayers].sort((a, b) => {
+            const yDiff = a.position.y - b.position.y;
+            if (Math.abs(yDiff) < 30) return a.position.x - b.position.x; // Same row-ish
+            return yDiff;
+        });
+
+        let currentY = 20; // Start with top padding
+
+        processedLayers = sorted.map(layer => {
+            // Clone style
+            const style = { ...layer.style };
+
+            // Scale Width (max out at container width - padding)
+            const margin = 5; // Minimal margin for end-to-end look
+            const maxW = targetWidth - (margin * 2);
+            let newW = Math.round(layer.size.width * scale);
+            // Don't shrink too tiny
+            if (newW < 20 && layer.type !== 'icon') newW = 20;
+            // Cap width
+            if (newW > maxW) newW = maxW;
+            // Force full width for text/buttons to use space
+            if (layer.type === 'text' || layer.type === 'button') newW = maxW;
+
+            // Scale Font Size
+            if (style.fontSize) {
+                style.fontSize = "18px";
+            }
+
+            // Calc Height
+            // For text, we estimate new height needed since width shrank
+            let newH = Math.round(layer.size.height * scale);
+            if (layer.type === 'text') {
+                style.padding = "0px"; // Remove padding
+                style.margin = "0px";
+
+                // Tight height estimation: chars * charWidth / width * lineHeight
+                // Avg char width ~ 9px for 18px font. Line height ~ 1.2
+                const textLen = layer.content.replace(/<[^>]*>/g, '').length; // Strip HTML tags
+                const lines = Math.ceil((textLen * 9) / newW);
+                newH = Math.max(24, lines * 22); // 22px line height
+            } else if (layer.type === 'button' || layer.type === 'email_form') {
+                // Keep touch targets accessible but tight
+                newH = 40;
+            }
+
+            // Center X
+            const newX = Math.round((targetWidth - newW) / 2);
+
+            // Stack Y
+            const newY = currentY;
+            currentY += newH; // Zero Gap
+
+            // Center text alignment for mobile flow
+            if (layer.type === 'text') {
+                style.textAlign = 'center';
+            }
+
+            return {
+                ...layer,
+                style,
+                position: { x: newX, y: newY },
+                size: { width: newW, height: newH }
+            };
+        });
+
+    } else {
+        // Tablet: Smart Scale (preserve layout but fit)
+        processedLayers = normalLayers.map(layer => {
+            const style = { ...layer.style };
+
+            // Scale Font Size
+            if (style.fontSize) {
+                const oldSize = parseNum(style.fontSize);
+                const newSize = Math.max(12, Math.round(oldSize * scale));
+                style.fontSize = `${newSize}px`;
+            }
+
+            return {
+                ...layer,
+                style,
+                position: {
+                    x: Math.round(layer.position.x * scale),
+                    y: Math.round(layer.position.y * scale),
+                },
+                size: {
+                    width: Math.round(layer.size.width * scale),
+                    height: Math.round(layer.size.height * scale),
+                },
+            };
+        });
+    }
+
+    // Handle Close Buttons (Always Top-Right or Top-Left, don't stack)
+    const processedCloseButtons = closeButtons.map(layer => {
+        // Detect if it was on the right or left
+        const param = scale; // Scale down size/pos
+        const isRight = layer.position.x > (baseWidth / 2);
+
+        const newSize = Math.max(24, Math.round(layer.size.width * scale));
+
+        return {
+            ...layer,
+            position: {
+                x: isRight ? targetWidth - newSize - 10 : 10,
+                y: 10
+            },
+            size: { width: newSize, height: newSize },
+            style: { ...layer.style }
+        };
+    });
+
+    // Re-merge (maintain roughly z-index by appending close buttons last as they are usually top)
+    // For height, if mobile, we need to know the final Y. We can calc it from processedLayers.
+    const mobileHeight = isMobile ? processedLayers.reduce((max, l) => Math.max(max, l.position.y + l.size.height), 0) + 40 : undefined;
+
+    return {
+        layers: [...processedLayers, ...processedCloseButtons],
+        height: mobileHeight
+    };
+};
+
+const getMobileLayer = (baseLayer: Layer, targetWidth: number, currentY: number) => {
+    // Clone style
+    const style = { ...baseLayer.style };
+
+    // Scale Font Size
+    if (style.fontSize) {
+        style.fontSize = "18px";
+    }
+
+    // Full width minus padding
+    const margin = 5;
+    const newW = targetWidth - (margin * 2);
+
+    // Calc Height
+    // For text, we estimate new height needed since width shrank
+    let newH = 40;
+    if (baseLayer.type === 'text') {
+        style.padding = "0px";
+        style.margin = "0px";
+        const textLen = baseLayer.content.replace(/<[^>]*>/g, '').length;
+        const lines = Math.ceil((textLen * 9) / newW);
+        newH = Math.max(24, lines * 22);
+    } else if (baseLayer.type === 'image' || baseLayer.type === 'video') {
+        // Keep aspect ratio
+        const ratio = baseLayer.size.height / baseLayer.size.width;
+        newH = Math.round(newW * ratio);
+    } else {
+        newH = Math.max(50, baseLayer.size.height); // Minimum touch target
+    }
+
+    // Center X
+    const newX = margin;
+
+    // Center text alignment for mobile flow
+    if (baseLayer.type === 'text') {
+        style.textAlign = 'center';
+    }
+
+    return {
+        ...baseLayer,
+        style,
+        position: { x: newX, y: currentY },
+        size: { width: newW, height: newH }
+    };
+};
+
 interface VisualEditorProps {
     banner: Banner;
     onChange: (banner: Banner) => void;
@@ -28,11 +218,25 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
     const [future, setFuture] = useState<ViewConfig[]>([]);
 
     // Ensure tablet view exists (for backward compatibility with old banners)
-    const normalizedView = banner.views[device] || {
-        ...banner.views.desktop,
-        width: device === "tablet" ? 768 : banner.views.desktop.width,
-        layers: banner.views.desktop.layers.map(layer => ({ ...layer })),
-    };
+    // Ensure view exists (sync with desktop or use saved view)
+    // Ensure view exists (sync with desktop or use saved view)
+    const normalizedView = (() => {
+        if (banner.views[device]) return banner.views[device];
+
+        // Derive from desktop for responsive behavior
+        const base = banner.views.desktop;
+        const targetWidth = device === "mobile" ? 375 : device === "tablet" ? 768 : (base.width || 1200);
+        const baseWidth = base.width || 1200;
+
+        const layout = getSmartResponsiveLayout(base.layers, targetWidth, baseWidth, device as "tablet" | "mobile");
+
+        return {
+            ...base,
+            width: targetWidth,
+            height: layout.height || base.height,
+            layers: layout.layers
+        };
+    })();
 
     const viewConfig: ViewConfig = {
         ...normalizedView,
@@ -135,16 +339,25 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
                 e.preventDefault();
                 redo();
             }
+            // Helper to check if user is typing in an input
+            const isTyping = () => {
+                const el = document.activeElement;
+                return (
+                    el?.tagName === 'INPUT' ||
+                    el?.tagName === 'TEXTAREA' ||
+                    el?.getAttribute('contenteditable') === 'true'
+                );
+            };
+
             // Copy: Ctrl+C
             if ((e.metaKey || e.ctrlKey) && e.key === "c") {
-                // Don't intercept if user is editing text (e.g. contentEditable)
-                if (document.activeElement?.getAttribute('contenteditable') === 'true') return;
+                if (isTyping()) return;
                 e.preventDefault();
                 copyLayer();
             }
             // Paste: Ctrl+V
             if ((e.metaKey || e.ctrlKey) && e.key === "v") {
-                if (document.activeElement?.getAttribute('contenteditable') === 'true') return;
+                if (isTyping()) return;
                 e.preventDefault();
                 pasteLayer();
             }
@@ -167,22 +380,15 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
     const updateView = (patch: any) => {
         saveHistory();
 
-        // Ensure tablet view exists in banner before updating
-        const updatedViews = { ...banner.views };
-        if (device === "tablet" && !updatedViews.tablet) {
-            // Create tablet view from desktop if it doesn't exist
-            updatedViews.tablet = {
-                ...banner.views.desktop,
-                width: 768,
-                layers: banner.views.desktop.layers.map(layer => ({ ...layer })),
-            };
-        }
-
+        // The viewConfig is already derived correctly (scaled/normalized) by our useMemo above.
+        // We just need to merge the patch and save it to the specific device slot.
+        // This implicitly "breaks sync" with desktop because we are now saving a specific 
+        // configuration for this device, so correct normalizedView will use this saved view hereafter.
         const newViewConfig = { ...viewConfig, ...patch };
 
         onChange({
             ...banner,
-            views: { ...updatedViews, [device]: newViewConfig },
+            views: { ...banner.views, [device]: newViewConfig },
         });
     };
 
@@ -197,6 +403,7 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
             textAlign: "center" as const,
         };
 
+        // ... (content switch) ...
         let content = "";
         let width = 160;
         let height = 40;
@@ -233,14 +440,85 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
             size: { width, height },
             style: baseStyle,
         };
-        updateView({ layers: [...viewConfig.layers, newLayer] });
+
+        const updatedViews = { ...banner.views };
+
+        // Add to current view
+        let newCurrentLayers = [...viewConfig.layers, newLayer];
+
+        // If we are on Desktop, propagate to others if they exist
+        if (device === "desktop") {
+            updatedViews.desktop = { ...updatedViews.desktop, layers: newCurrentLayers };
+
+            // Propagate to Mobile/Tablet if they are already forked
+            (["tablet", "mobile"] as const).forEach(d => {
+                const view = updatedViews[d];
+                if (view) {
+                    // Smart add: calculate position for this device
+                    // For mobile, append to bottom
+                    let layerToAdd = { ...newLayer };
+                    if (d === "mobile") {
+                        // Simple approximation: put at bottom
+                        const maxY = view.layers.reduce((max, l) => Math.max(max, l.position.y + l.size.height), 0);
+                        layerToAdd = getMobileLayer(newLayer, view.width || 375, maxY + 20);
+                        // Expand view height if needed
+                        updatedViews[d] = {
+                            ...view,
+                            height: Math.max(view.height, layerToAdd.position.y + layerToAdd.size.height + 20),
+                            layers: [...view.layers, layerToAdd]
+                        };
+                    } else {
+                        updatedViews[d] = { ...view, layers: [...view.layers, layerToAdd] };
+                    }
+                }
+            });
+
+            // For current device (desktop), we already updated updatedViews.desktop
+            // But we need to call onChange with the FULL structure
+            onChange({
+                ...banner,
+                views: updatedViews,
+            });
+            setSelectedLayerId(newLayer.id);
+            return;
+        }
+
+        // If not desktop, just add to current
+        updateView({ layers: newCurrentLayers });
         setSelectedLayerId(newLayer.id);
     };
 
     const updateLayer = (id: string, patch: Partial<Layer>) => {
-        updateView({
-            layers: viewConfig.layers.map((l) => (l.id === id ? { ...l, ...patch } : l)),
-        });
+        const updatedViews = { ...banner.views };
+
+        // Update current view logic first
+        const newLayers = viewConfig.layers.map((l) => (l.id === id ? { ...l, ...patch } : l));
+
+        // If on Desktop, and we are changing CONTENT (text/image), propagate to other views
+        if (device === "desktop" && (patch.content !== undefined || patch.type !== undefined)) { // Type check just in case
+            updatedViews.desktop = { ...updatedViews.desktop, layers: newLayers };
+
+            (["tablet", "mobile"] as const).forEach(d => {
+                const view = updatedViews[d];
+                if (view) {
+                    const viewLayers = view.layers.map(l => {
+                        if (l.id === id) {
+                            return { ...l, content: patch.content! }; // Propagate content only
+                        }
+                        return l;
+                    });
+                    updatedViews[d] = { ...view, layers: viewLayers };
+                }
+            });
+
+            onChange({
+                ...banner,
+                views: updatedViews,
+            });
+            return;
+        }
+
+        updateView({ layers: newLayers });
     };
 
     const reorderLayers = (oldIndex: number, newIndex: number) => {
@@ -249,7 +527,19 @@ export function VisualEditor({ banner, onChange }: VisualEditorProps) {
     };
 
     const deleteLayer = (id: string) => {
-        updateView({ layers: viewConfig.layers.filter((l) => l.id !== id) });
+        if (device === "desktop") {
+            const updatedViews = { ...banner.views };
+            // Delete from all views
+            (["desktop", "tablet", "mobile"] as const).forEach(d => {
+                const view = updatedViews[d];
+                if (view) {
+                    updatedViews[d] = { ...view, layers: view.layers.filter(l => l.id !== id) };
+                }
+            });
+            onChange({ ...banner, views: updatedViews });
+        } else {
+            updateView({ layers: viewConfig.layers.filter((l) => l.id !== id) });
+        }
         setSelectedLayerId(null);
     };
 

@@ -9,6 +9,7 @@ import {
     Palette,
     BarChart3,
     Settings,
+    Split,
     LogOut,
     User
 } from "lucide-react";
@@ -20,8 +21,8 @@ const navItems = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Campaigns", href: "/campaigns", icon: Megaphone },
     { name: "Templates", href: "/templates", icon: Palette },
+    { name: "A/B Tests", href: "/ab-tests", icon: Split },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
-    { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export default function Sidebar() {
@@ -51,7 +52,7 @@ export default function Sidebar() {
     };
 
     return (
-        <aside className="w-20 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-black h-screen fixed left-0 top-0 flex flex-col">
+        <aside className="w-20 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-black h-screen fixed left-0 top-0 flex flex-col z-[100]">
             <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-center">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 flex items-center justify-center text-white font-bold text-lg">
                     M

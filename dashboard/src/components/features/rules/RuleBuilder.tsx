@@ -11,18 +11,18 @@ interface RuleBuilderProps {
 
 export function RuleBuilder({ rules, onChange }: RuleBuilderProps) {
     const handleGroupChange = (index: number, newGroup: RuleGroupType) => {
-        const newGroups = [...rules.ruleGroups];
+        const newGroups = [...(rules.ruleGroups || [])];
         newGroups[index] = newGroup;
         onChange({ ...rules, ruleGroups: newGroups });
     };
 
     const handleDeleteGroup = (index: number) => {
-        const newGroups = rules.ruleGroups.filter((_, i) => i !== index);
+        const newGroups = (rules.ruleGroups || []).filter((_, i) => i !== index);
         onChange({ ...rules, ruleGroups: newGroups });
     };
 
     const addGroup = () => {
-        const newGroups = [...rules.ruleGroups, createEmptyRuleGroup()];
+        const newGroups = [...(rules.ruleGroups || []), createEmptyRuleGroup()];
         onChange({ ...rules, ruleGroups: newGroups });
     };
 
@@ -40,7 +40,7 @@ export function RuleBuilder({ rules, onChange }: RuleBuilderProps) {
             </div>
 
             <div className="space-y-4">
-                {rules.ruleGroups.map((group, index) => (
+                {(rules.ruleGroups || []).map((group, index) => (
                     <React.Fragment key={group.id}>
                         {index > 0 && (
                             <div className="flex justify-center my-4">
@@ -70,7 +70,7 @@ export function RuleBuilder({ rules, onChange }: RuleBuilderProps) {
                             group={group}
                             onChange={(g) => handleGroupChange(index, g)}
                             onDelete={() => handleDeleteGroup(index)}
-                            showDelete={rules.ruleGroups.length > 0}
+                            showDelete={(rules.ruleGroups || []).length > 0}
                         />
                     </React.Fragment>
                 ))}

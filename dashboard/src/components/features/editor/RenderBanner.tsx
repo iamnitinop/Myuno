@@ -25,7 +25,24 @@ export function RenderBanner({ banner, device, onClose, onCta }: RenderBannerPro
     const renderContent = (layer: any) => {
         switch (layer.type) {
             case "image":
-                return <img src={layer.content} alt="" className="w-full h-full object-cover" />;
+                return (
+                    <div className="w-full h-full relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={layer.content}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling;
+                                if (fallback) fallback.classList.remove('hidden');
+                            }}
+                        />
+                        <div className="hidden w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400 p-2 text-center pointer-events-none border border-dashed border-gray-300">
+                            <span className="text-[10px]">Broken Image</span>
+                        </div>
+                    </div>
+                );
 
             case "video":
                 return (

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { uid, LS } from "@/lib/utils";
-import { defaultBanner, defaultRules } from "@/lib/defaults";
+import { defaultBanner, defaultRules, KEY_DATA } from "@/lib/defaults";
 import { AccountData, Banner, TargetingRules, AdvancedTargetingRules } from "@/lib/types";
 import { VisualEditor } from "@/components/features/editor/visual/VisualEditor";
 import { RuleBuilder } from "@/components/features/rules";
@@ -13,10 +13,10 @@ import { PublishSettings } from "@/components/features/publish/PublishSettings";
 import { Pill } from "@/components/ui/Pill";
 import { Card } from "@/components/ui/Card";
 import { ensureAdvancedRules } from "@/lib/rule-migration";
-import { ArrowLeft, Pencil, Check, X } from "lucide-react";
+import { ArrowLeft, Pencil, Check, X, Eye } from "lucide-react";
 import Link from "next/link";
 
-const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v3`;
+
 
 function getOrCreateAccountData(accountId: string): AccountData {
     const existing = LS.get(KEY_DATA(accountId), null);
@@ -26,6 +26,7 @@ function getOrCreateAccountData(accountId: string): AccountData {
         accountId,
         banners: [defaultBanner(bannerId)],
         rules: [defaultRules(bannerId)],
+        abTests: [],
         events: [],
     };
     LS.set(KEY_DATA(accountId), data);
@@ -69,7 +70,7 @@ export default function CampaignEditor({ campaignId }: { campaignId: string }) {
 
     // Check if it's an email capture campaign (contains email form)
     const isAdvancedTargeting = banner.views.desktop.layers.some(l => l.type === 'email_form') ||
-        banner.views.mobile.layers.some(l => l.type === 'email_form');
+        (banner.views.mobile?.layers.some(l => l.type === 'email_form') ?? false);
 
     // Auto-save (no toast)
     const autoSave = (next: AccountData) => {
@@ -196,6 +197,15 @@ export default function CampaignEditor({ campaignId }: { campaignId: string }) {
                     )}
                     <p className="text-sm text-gray-500">Edit your campaign settings and design</p>
                 </div>
+
+                {/* Preview Button */}
+                <button
+                    onClick={() => router.push(`/campaigns/${campaignId}/preview`)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md shadow-sm transition-all text-sm font-medium"
+                >
+                    <Eye className="w-4 h-4" />
+                    <span>Preview</span>
+                </button>
             </div>
 
             {/* Main Content */}
@@ -217,7 +227,7 @@ export default function CampaignEditor({ campaignId }: { campaignId: string }) {
                         ) : (
                             <div className="grid gap-6 lg:grid-cols-2 max-w-7xl mx-auto">
                                 <Card title="Rule Builder">
-                                    <RuleBuilder rules={rawRules as TargetingRules} onChange={(r) => updateRules(ensureAdvancedRules(r))} />
+                                    <RuleBuilder rules={rules} onChange={updateRules} />
                                 </Card>
                                 <Card title="Rule Simulator">
                                     <TargetingSimulator banner={banner} rules={rules as AdvancedTargetingRules} />

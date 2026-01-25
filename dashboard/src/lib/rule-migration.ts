@@ -106,3 +106,26 @@ export function createDefaultAdvancedRules(bannerId: string): AdvancedTargetingR
         config: JSON.parse(JSON.stringify(defaultConfig)),
     };
 }
+
+/**
+ * Create a new empty rule group
+ */
+export function createEmptyRuleGroup(): import("./types").RuleGroup {
+    return {
+        id: uid(),
+        conditionOperator: "AND",
+        conditions: []
+    };
+}
+
+/**
+ * Create a new empty condition
+ */
+export function createEmptyCondition(): import("./types").AdvancedRuleCondition {
+    return {
+        id: uid(),
+        type: "current_url",
+        operator: "contains",
+        value: ""
+    };
+}

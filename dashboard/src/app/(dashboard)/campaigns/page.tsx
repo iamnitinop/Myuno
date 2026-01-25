@@ -8,8 +8,7 @@ import { AccountData } from "@/lib/types";
 import { CreatePromotionModal } from "@/components/features/campaigns/CreatePromotionModal";
 import { exportCampaign } from "@/lib/campaign-export";
 import { ensureAdvancedRules } from "@/lib/rule-migration";
-
-const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v3`;
+import { KEY_DATA } from "@/lib/defaults";
 
 export default function CampaignsPage() {
     const router = useRouter();

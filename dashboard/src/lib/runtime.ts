@@ -153,13 +153,18 @@ export function evalAdvancedRules({
     url,
     referrer,
     storage,
+    device,
 }: {
     rules?: AdvancedTargetingRules;
     url: string;
     referrer: string;
     storage: { session: any; local: any };
+    device?: string;
 }): boolean {
     if (!rules?.enabled) return false;
+
+    // device default to desktop if missing
+    const currentDevice = device || 'desktop';
 
     const config = rules.config;
     if (!config) return true; // Should not happen but fail open or closed? Open is usually better for testing.
@@ -258,7 +263,56 @@ export function evalAdvancedRules({
         }
     }
 
+    // 6. Custom Rule Groups (from Rule Builder)
+    if (rules.ruleGroups && rules.ruleGroups.length > 0) {
+        // Iterate through all groups. 
+        // We assume groups are "OR" (alternative paths to matching) at the top level.
+        // If ANY group matches, we return true.
+
+        const anyGroupMatches = rules.ruleGroups.some(group => {
+            // Evaluate conditions in this group
+            if (group.conditions.length === 0) return true; // Empty group matches? Or ignored? Let's say ignored (true) or strict?
+
+            console.log(`Evaluating Group ${group.id}: Op=${group.conditionOperator}`);
+
+            // Check conditionOperator within group (AND/OR)
+            if (group.conditionOperator === "OR") {
+                const result = group.conditions.some(c => {
+                    const r = evaluateCondition(c, url, referrer, storage, currentDevice);
+                    console.log(`  OR Condition ${c.type} ${c.operator} ${c.value} -> ${r}`);
+                    return r;
+                });
+                console.log(`  Group OR Result: ${result}`);
+                return result;
+            } else {
+                // Default to AND
+                const result = group.conditions.every(c => {
+                    const r = evaluateCondition(c, url, referrer, storage, currentDevice);
+                    console.log(`  AND Condition ${c.type} ${c.operator} ${c.value} -> ${r}`);
+                    return r;
+                });
+                console.log(`  Group AND Result: ${result}`);
+                return result;
+            }
+        });
+
+        if (!anyGroupMatches) return false;
+    }
+
     return true;
+}
+
+function evaluateCondition(c: AdvancedRuleCondition, url: string, referrer: string, storage: any, device: string): boolean {
+    // Map values based on type
+    let actualValue = "";
+
+    if (c.type === "current_url") actualValue = url;
+    else if (c.type === "referring_url") actualValue = referrer;
+    else if (c.type === "first_url") actualValue = storage.session.getItem(FIRST_URL_SESSION_KEY) || ""; // simplified
+    else if (c.type === "previous_domain_referring_url") actualValue = getHostSafe(referrer);
+    // Add more types as needed
+
+    return matchString(actualValue, c.operator, c.value);
 }
 
 /**

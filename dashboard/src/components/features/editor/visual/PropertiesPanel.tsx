@@ -15,7 +15,43 @@ import {
     Trash2
 } from "lucide-react";
 
+import { BackgroundUrlInput } from "./BackgroundUrlInput";
+
 import { Accordion, AccordionItem } from "@/components/ui/Accordion";
+import { useEffect, useState } from "react";
+
+// Internal Debounced Input Component
+function DebouncedInput({
+    value: initialValue,
+    onChange,
+    delay = 300,
+    ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { label?: string; delay?: number }) {
+    const [value, setValue] = useState(initialValue);
+
+    useEffect(() => {
+        setValue(initialValue);
+    }, [initialValue]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (value !== initialValue) {
+                // @ts-ignore
+                onChange?.({ target: { value } } as any);
+            }
+        }, delay);
+
+        return () => clearTimeout(timer);
+    }, [value, onChange, delay, initialValue]);
+
+    return (
+        <Input
+            {...props}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+        />
+    );
+}
 
 interface PropertiesPanelProps {
     selectedLayer: Layer | null;
@@ -235,6 +271,15 @@ export function PropertiesPanel({
                                     </div>
                                 </div>
                             )}
+
+
+                            <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Or enter Image URL</label>
+                                <BackgroundUrlInput
+                                    value={canvasSettings.backgroundImage || ""}
+                                    onChange={(val) => onCanvasChange({ backgroundImage: val })}
+                                />
+                            </div>
                         </div>
                     </AccordionItem>
 
@@ -445,7 +490,7 @@ export function PropertiesPanel({
 
                         {/* Content */}
                         {selectedLayer.type === "text" || selectedLayer.type === "button" ? (
-                            <Input
+                            <DebouncedInput
                                 label="Text Content"
                                 value={selectedLayer.content}
                                 onChange={(e) => onChange(selectedLayer.id, { content: e.target.value })}
@@ -453,11 +498,13 @@ export function PropertiesPanel({
                         ) : null}
 
                         {selectedLayer.type === "image" ? (
-                            <Input
-                                label="Image URL"
-                                value={selectedLayer.content}
-                                onChange={(e) => onChange(selectedLayer.id, { content: e.target.value })}
-                            />
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Image URL</label>
+                                <DebouncedInput
+                                    value={selectedLayer.content}
+                                    onChange={(e) => onChange(selectedLayer.id, { content: e.target.value })}
+                                />
+                            </div>
                         ) : null}
 
                         {selectedLayer.type === "video" ? (

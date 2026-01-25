@@ -68,8 +68,8 @@ export interface Banner {
     type: BannerType;
     views: {
         desktop: ViewConfig;
-        tablet: ViewConfig;
-        mobile: ViewConfig;
+        tablet?: ViewConfig;
+        mobile?: ViewConfig;
     };
 }
 
@@ -194,6 +194,7 @@ export interface AdvancedTargetingRules {
     bannerId: string;
     enabled: boolean;
     config: AdvancedTargetingConfig; // The specific UI state
+    ruleGroups?: RuleGroup[]; // Custom rule groups from Rule Builder
     // We keep specific fields for runtime efficiency if needed, but config is the source of truth for this editor
 }
 
@@ -203,10 +204,26 @@ export interface TargetingRules {
     conditions: RuleCondition[];
 }
 
+export interface ABTest {
+    id: string;
+    name: string;
+    device: 'desktop' | 'mobile';
+    startDate: string; // ISO string
+    endDate: string; // ISO string
+    baselineId: string;
+    baselinePercentage: number;
+    variants: {
+        bannerId: string; // 'control' for Control Group, or banner ID
+        percentage: number;
+    }[];
+    status: 'draft' | 'scheduled' | 'running' | 'ended';
+}
+
 export interface AccountData {
     accountId: string;
     banners: Banner[];
     rules: (TargetingRules | AdvancedTargetingRules)[];
+    abTests: ABTest[];
     events: any[];
 }
 

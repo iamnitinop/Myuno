@@ -13,7 +13,7 @@ interface CreatePromotionModalProps {
     onClose: () => void;
 }
 
-const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v3`;
+const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v4`;
 
 export function CreatePromotionModal({ isOpen, onClose }: CreatePromotionModalProps) {
     const router = useRouter();

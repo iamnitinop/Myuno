@@ -27,33 +27,35 @@ export function migrateToResponsive(oldBanner: Banner): ResponsiveBanner {
     // Migrate layers
     const responsiveLayers: ResponsiveLayer[] = desktopView.layers.map((desktopLayer) => {
         // Find corresponding mobile layer (by ID or position)
-        const mobileLayer = mobileView.layers.find(l => l.id === desktopLayer.id);
+        const mobileLayer = mobileView?.layers.find(l => l.id === desktopLayer.id);
 
         return migrateLayerToResponsive(desktopLayer, mobileLayer);
     });
 
     // Add any mobile-only layers
-    mobileView.layers.forEach((mobileLayer) => {
-        const existsInDesktop = desktopView.layers.some(l => l.id === mobileLayer.id);
-        if (!existsInDesktop) {
-            // This is a mobile-only layer, create with mobile as base
-            responsiveLayers.push(migrateLayerToResponsive(mobileLayer, undefined, true));
-        }
-    });
+    if (mobileView) {
+        mobileView.layers.forEach((mobileLayer) => {
+            const existsInDesktop = desktopView.layers.some(l => l.id === mobileLayer.id);
+            if (!existsInDesktop) {
+                // This is a mobile-only layer, create with mobile as base
+                responsiveLayers.push(migrateLayerToResponsive(mobileLayer, undefined, true));
+            }
+        });
+    }
 
     // Migrate view config
     const responsiveView: ResponsiveViewConfig = {
         width: desktopView.width !== undefined ? createResponsiveProperty(desktopView.width) : undefined,
-        height: migrateProperty(desktopView.height, mobileView.height),
-        background: migrateProperty(desktopView.background, mobileView.background),
-        backgroundImage: migrateOptionalProperty(desktopView.backgroundImage, mobileView.backgroundImage),
-        backgroundOpacity: migrateOptionalProperty(desktopView.backgroundOpacity, mobileView.backgroundOpacity),
-        borderWidth: migrateOptionalProperty(desktopView.borderWidth, mobileView.borderWidth),
-        borderColor: migrateOptionalProperty(desktopView.borderColor, mobileView.borderColor),
-        borderStyle: migrateOptionalProperty(desktopView.borderStyle, mobileView.borderStyle),
-        borderRadius: migrateOptionalProperty(desktopView.borderRadius, mobileView.borderRadius),
-        boxShadow: migrateOptionalProperty(desktopView.boxShadow, mobileView.boxShadow),
-        padding: migrateOptionalProperty(desktopView.padding, mobileView.padding),
+        height: migrateProperty(desktopView.height, mobileView?.height),
+        background: migrateProperty(desktopView.background, mobileView?.background),
+        backgroundImage: migrateOptionalProperty(desktopView.backgroundImage, mobileView?.backgroundImage),
+        backgroundOpacity: migrateOptionalProperty(desktopView.backgroundOpacity, mobileView?.backgroundOpacity),
+        borderWidth: migrateOptionalProperty(desktopView.borderWidth, mobileView?.borderWidth),
+        borderColor: migrateOptionalProperty(desktopView.borderColor, mobileView?.borderColor),
+        borderStyle: migrateOptionalProperty(desktopView.borderStyle, mobileView?.borderStyle),
+        borderRadius: migrateOptionalProperty(desktopView.borderRadius, mobileView?.borderRadius),
+        boxShadow: migrateOptionalProperty(desktopView.boxShadow, mobileView?.boxShadow),
+        padding: migrateOptionalProperty(desktopView.padding, mobileView?.padding),
         layers: responsiveLayers,
     };
 
@@ -66,7 +68,7 @@ export function migrateToResponsive(oldBanner: Banner): ResponsiveBanner {
         canvasSizes: {
             desktop: { width: desktopView.width || 1200, height: desktopView.height },
             tablet: { width: 768, height: desktopView.height },
-            mobile: { width: mobileView.width || 375, height: mobileView.height },
+            mobile: { width: mobileView?.width || 375, height: mobileView?.height ?? desktopView.height },
         },
     };
 }

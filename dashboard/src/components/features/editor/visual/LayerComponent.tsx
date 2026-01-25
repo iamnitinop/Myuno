@@ -33,6 +33,15 @@ export function LayerComponent({
         }
     }, [isSelected]);
 
+    // Manual content sync
+    useEffect(() => {
+        if (contentRef.current && !isEditing) {
+            if (contentRef.current.innerHTML !== layer.content) {
+                contentRef.current.innerHTML = layer.content;
+            }
+        }
+    }, [layer.content, isEditing]);
+
     const handleBlur = () => {
         if (contentRef.current) {
             onChange(layer.id, { content: contentRef.current.innerHTML });
@@ -159,6 +168,7 @@ export function LayerComponent({
                     }
                 }}
             >
+                {/* Manually manage content to prevent React reconciling user typing while editing */}
                 {isText ? (
                     <div
                         ref={contentRef}
@@ -177,11 +187,26 @@ export function LayerComponent({
                             textAlign: layer.style.textAlign as any,
                             color: layer.style.color,
                         }}
-                        dangerouslySetInnerHTML={{ __html: layer.content }}
                     />
                 ) : layer.type === "image" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={layer.content} alt="" className="w-full h-full object-cover pointer-events-none" />
+                    <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={layer.content}
+                            alt=""
+                            className="w-full h-full object-cover pointer-events-none"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling;
+                                if (fallback) fallback.classList.remove('hidden');
+                            }}
+                        />
+                        <div className="hidden w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400 p-2 text-center pointer-events-none border border-dashed border-gray-300">
+                            <span className="text-xs font-medium">Broken Image</span>
+                            <span className="text-[10px] opacity-75 mt-1 break-all line-clamp-2">{layer.content}</span>
+                        </div>
+                    </>
                 ) : layer.type === "timer" ? (
                     <TimerLayer targetDate={layer.content} style={layer.style} timerDisplay={layer.metadata?.timerDisplay} boxColor={layer.metadata?.boxColor} labelColor={layer.metadata?.labelColor} padding={layer.metadata?.padding} minWidth={layer.metadata?.minWidth} gap={layer.metadata?.gap} borderRadius={layer.metadata?.borderRadius} />
                 ) : layer.type === "email_form" ? (
