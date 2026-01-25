@@ -40,10 +40,14 @@ export class EmailCaptureService {
         if (query.startDate || query.endDate) {
             where.createdAt = {};
             if (query.startDate) {
-                where.createdAt.gte = new Date(query.startDate);
+                const startDate = new Date(query.startDate);
+                startDate.setHours(0, 0, 0, 0);
+                where.createdAt.gte = startDate;
             }
             if (query.endDate) {
-                where.createdAt.lte = new Date(query.endDate);
+                const endDate = new Date(query.endDate);
+                endDate.setHours(23, 59, 59, 999);
+                where.createdAt.lte = endDate;
             }
         }
 

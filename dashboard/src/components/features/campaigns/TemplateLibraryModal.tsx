@@ -5,15 +5,13 @@ import { templateLibrary, TemplateInfo } from "@/lib/templates";
 import { useRouter } from "next/navigation";
 import { LS } from "@/lib/utils";
 import { AccountData } from "@/lib/types";
-import { defaultRules } from "@/lib/defaults";
-import Image from "next/image";
+import { defaultRules, KEY_DATA } from "@/lib/defaults";
+import { BannerRenderer } from "@/components/features/preview/BannerRenderer";
 
 interface TemplateLibraryModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
-
-const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v3`;
 
 export function TemplateLibraryModal({ isOpen, onClose }: TemplateLibraryModalProps) {
     const router = useRouter();
@@ -26,8 +24,14 @@ export function TemplateLibraryModal({ isOpen, onClose }: TemplateLibraryModalPr
             accountId,
             banners: [],
             rules: [],
+            abTests: [],
             events: [],
         });
+
+        if (!data.banners) data.banners = [];
+        if (!data.rules) data.rules = [];
+        if (!data.abTests) data.abTests = [];
+        if (!data.events) data.events = [];
 
         // Generate banner from template
         const newBanner = template.generator();
@@ -38,8 +42,8 @@ export function TemplateLibraryModal({ isOpen, onClose }: TemplateLibraryModalPr
 
         LS.set(KEY_DATA(accountId), data);
 
-        // Navigate to editor
-        router.push(`/campaigns/${newBanner.id}`);
+        // Navigate to editor (Hard navigation to bypass cache)
+        window.location.href = `/campaigns/${newBanner.id}`;
         onClose();
     };
 
@@ -80,30 +84,40 @@ export function TemplateLibraryModal({ isOpen, onClose }: TemplateLibraryModalPr
                                     className="border-2 border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
                                 >
                                     {/* Template Preview */}
-                                    <div className="bg-gray-100 dark:bg-gray-800 aspect-video relative flex items-center justify-center p-4">
-                                        {/* Mock preview - showing the template design */}
-                                        <div className="relative w-full h-full bg-white dark:bg-gray-900 rounded-lg shadow-lg flex">
-                                            {/* Yellow section */}
-                                            <div className="w-1/2 bg-[#F5C542] rounded-l-lg flex items-center justify-center p-4">
-                                                <div className="w-24 h-20 relative">
-                                                    <Image
-                                                        src="/assets/vintage-car.png"
-                                                        alt="Vintage Car"
-                                                        fill
-                                                        className="object-contain"
-                                                    />
+                                    <div className="bg-gray-100 dark:bg-gray-800 aspect-video relative flex items-center justify-center p-4 overflow-hidden">
+                                        {(() => {
+                                            const banner = template.generator();
+                                            const view = banner.views.desktop;
+                                            // Calculate scale to fit in roughly 300x160 box
+                                            const scale = 300 / (view.width || 800);
+
+                                            return (
+                                                <div
+                                                    style={{
+                                                        transform: `scale(${scale})`,
+                                                        transformOrigin: 'center center',
+                                                        width: view.width || 800,
+                                                        height: view.height,
+                                                        position: 'absolute'
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            width: '100%',
+                                                            height: '100%',
+                                                            backgroundColor: view.background,
+                                                            backgroundImage: view.backgroundImage,
+                                                            borderRadius: view.borderRadius,
+                                                            boxShadow: view.boxShadow,
+                                                            position: 'relative',
+                                                            overflow: 'hidden'
+                                                        }}
+                                                    >
+                                                        <BannerRenderer layers={view.layers} />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            {/* White section */}
-                                            <div className="w-1/2 p-4 flex flex-col items-center justify-center gap-2">
-                                                <div className="text-lg font-bold text-gray-800 dark:text-gray-200">Welcome</div>
-                                                <div className="text-[10px] text-gray-500 text-center">
-                                                    Sign up below for exclusive news & offers.
-                                                </div>
-                                                <div className="w-full h-5 bg-white dark:bg-gray-800 border border-gray-300 rounded mt-1"></div>
-                                                <div className="w-full h-5 bg-gray-800 dark:bg-gray-700 rounded"></div>
-                                            </div>
-                                        </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* Template Info */}

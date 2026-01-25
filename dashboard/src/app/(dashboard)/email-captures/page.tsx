@@ -18,6 +18,8 @@ export default function EmailCapturesPage() {
     const [captures, setCaptures] = useState<EmailCapture[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [fromDate, setFromDate] = useState("");
+    const [toDate, setToDate] = useState("");
 
     useEffect(() => {
         fetchCaptures();
@@ -39,16 +41,21 @@ export default function EmailCapturesPage() {
 
     const handleDownloadCSV = async () => {
         try {
-            const response = await fetch("http://localhost:3001/email-capture/export/csv");
+            const params = new URLSearchParams();
+            if (fromDate) params.append("startDate", fromDate);
+            if (toDate) params.append("endDate", toDate);
+
+            const url = `http://localhost:3001/email-capture/export/csv?${params.toString()}`;
+            const response = await fetch(url);
             if (response.ok) {
                 const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
+                const downloadUrl = window.URL.createObjectURL(blob);
                 const a = document.createElement("a");
-                a.href = url;
+                a.href = downloadUrl;
                 a.download = `email-captures-${new Date().toISOString().split('T')[0]}.csv`;
                 document.body.appendChild(a);
                 a.click();
-                window.URL.revokeObjectURL(url);
+                window.URL.revokeObjectURL(downloadUrl);
                 document.body.removeChild(a);
             }
         } catch (error) {
@@ -56,10 +63,24 @@ export default function EmailCapturesPage() {
         }
     };
 
-    const filteredCaptures = captures.filter((capture) =>
-        capture.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (capture.campaignId && capture.campaignId.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const filteredCaptures = captures.filter((capture) => {
+        // Text search filter
+        const matchesSearch = capture.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (capture.campaignId && capture.campaignId.toLowerCase().includes(searchTerm.toLowerCase()));
+
+        // Date range filter
+        const captureDate = new Date(capture.createdAt);
+        const from = fromDate ? new Date(fromDate) : null;
+        const to = toDate ? new Date(toDate) : null;
+
+        // Set time to start/end of day for accurate comparison
+        if (from) from.setHours(0, 0, 0, 0);
+        if (to) to.setHours(23, 59, 59, 999);
+
+        const matchesDateRange = (!from || captureDate >= from) && (!to || captureDate <= to);
+
+        return matchesSearch && matchesDateRange;
+    });
 
     return (
         <div className="p-6 space-y-6">
@@ -81,16 +102,43 @@ export default function EmailCapturesPage() {
                 </button>
             </div>
 
-            {/* Search Bar */}
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                    type="text"
-                    placeholder="Search by email or campaign ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+            {/* Search and Date Filter */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Search Bar */}
+                <div className="relative md:col-span-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search by email or campaign ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                </div>
+
+                {/* From Date */}
+                <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        placeholder="From date"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                </div>
+
+                {/* To Date */}
+                <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        placeholder="To date"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                </div>
             </div>
 
             {/* Stats */}
