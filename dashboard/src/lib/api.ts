@@ -1,4 +1,4 @@
-export const API_URL = "http://localhost:3001";
+export const API_URL = "https://myuno-cnmk.vercel.app/";
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     const headers = {
