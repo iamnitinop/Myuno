@@ -23,6 +23,7 @@ function getOrCreateAccountData(accountId: string): AccountData {
         accountId,
         banners: [defaultBanner(bannerId)],
         rules: [defaultRules(bannerId)],
+        abTests: [],
         events: [],
     };
     LS.set(KEY_DATA(accountId), data);

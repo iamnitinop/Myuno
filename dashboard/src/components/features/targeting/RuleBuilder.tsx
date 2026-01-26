@@ -17,25 +17,25 @@ interface RuleBuilderProps {
 
 export function RuleBuilder({ rules, onChange }: RuleBuilderProps) {
     const handleGroupChange = (index: number, group: RuleGroup) => {
-        const newGroups = [...rules.ruleGroups];
+        const newGroups = [...(rules.ruleGroups || [])];
         newGroups[index] = group;
         onChange({ ...rules, ruleGroups: newGroups });
     };
 
     const handleGroupRemove = (index: number) => {
-        const newGroups = rules.ruleGroups.filter((_, i) => i !== index);
+        const newGroups = (rules.ruleGroups || []).filter((_, i) => i !== index);
         onChange({ ...rules, ruleGroups: newGroups });
     };
 
     const handleAddGroup = () => {
         const newGroup = createEmptyRuleGroup();
-        onChange({ ...rules, ruleGroups: [...rules.ruleGroups, newGroup] });
+        onChange({ ...rules, ruleGroups: [...(rules.ruleGroups || []), newGroup] });
     };
 
     return (
         <div className="space-y-4">
             {/* Rule Groups */}
-            {rules.ruleGroups.map((group, index) => (
+            {(rules.ruleGroups || []).map((group, index) => (
                 <React.Fragment key={group.id}>
                     <RuleGroupEditor
                         group={group}
@@ -45,9 +45,9 @@ export function RuleBuilder({ rules, onChange }: RuleBuilderProps) {
                     />
 
                     {/* AND/OR toggle between groups */}
-                    {index < rules.ruleGroups.length - 1 && (
+                    {index < (rules.ruleGroups || []).length - 1 && (
                         <AndOrToggle
-                            value={rules.groupOperator}
+                            value={rules.groupOperator || "AND"}
                             onChange={(op) => onChange({ ...rules, groupOperator: op })}
                             className="my-6"
                         />
@@ -65,7 +65,7 @@ export function RuleBuilder({ rules, onChange }: RuleBuilderProps) {
             </button>
 
             {/* Help Text */}
-            {rules.ruleGroups.length === 0 && (
+            {(rules.ruleGroups || []).length === 0 && (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                     <p className="text-sm">No rules defined. Click "Add Rule Group" to get started.</p>
                     <p className="text-xs mt-2">Banner will show to all visitors when no rules are set.</p>

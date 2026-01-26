@@ -195,7 +195,7 @@ export interface AdvancedTargetingRules {
     enabled: boolean;
     config: AdvancedTargetingConfig; // The specific UI state
     ruleGroups?: RuleGroup[]; // Custom rule groups from Rule Builder
-    // We keep specific fields for runtime efficiency if needed, but config is the source of truth for this editor
+    groupOperator?: LogicalOperator; // How to combine custom rule groups
 }
 
 export interface TargetingRules {

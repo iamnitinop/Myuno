@@ -175,7 +175,7 @@ export function TargetingBuilder({ banner, rules, onChange }: TargetingProps) {
             </Card>
 
             <Card title="Rule Simulator">
-                <TargetingSimulator banner={banner} rules={rules} />
+                <TargetingSimulator banner={banner} rules={rules as any} />
             </Card>
         </div>
     );
