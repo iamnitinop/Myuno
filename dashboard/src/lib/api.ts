@@ -1,4 +1,4 @@
-export const API_URL = "https://myuno-cnmk.vercel.app/";
+export const API_URL = "https://web-production-75bfb.up.railway.app";
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     const headers = {
