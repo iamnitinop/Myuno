@@ -41,11 +41,8 @@ export default function Sidebar() {
     }, []);
 
     const handleLogout = () => {
-        // Clear all authentication data
-        LS.del("accessToken");
-        LS.del("refreshToken");
-        LS.del("userEmail");
-        LS.del("userPlan");
+        // Clear ALL localStorage to prevent data sharing between accounts
+        localStorage.clear();
 
         // Redirect to login
         router.push("/login");
@@ -112,6 +109,14 @@ export default function Sidebar() {
                                         </p>
                                     </div>
                                 </div>
+                                {/* Account Number Display */}
+                                <div className="mb-3 px-2 py-1 bg-gray-800 rounded border border-gray-700">
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-0.5">Account Number:</p>
+                                    <p className="text-xs font-mono text-red-500 truncate select-all">
+                                        {LS.get("accountId", "Loading...")}
+                                    </p>
+                                </div>
+
                                 <button className="w-full py-2 px-4 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors">
                                     Upgrade Account
                                 </button>
