@@ -7,9 +7,8 @@ import { AccountData, ViewConfig } from "@/lib/types";
 import { LS } from "@/lib/utils";
 import { Monitor, Smartphone, Tablet, X, Check, ArrowLeft } from "lucide-react";
 import { Pill } from "@/components/ui/Pill";
-import { KEY_DATA } from "@/lib/defaults";
-
-const ACCOUNT_ID = "ACC_DEMO_001";
+import { defaultBanner, defaultRules } from "@/lib/defaults";
+import { apiFetch } from "@/lib/api";
 
 export default function CampaignPreviewPage() {
     const params = useParams();
@@ -19,19 +18,41 @@ export default function CampaignPreviewPage() {
     const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
     const [data, setData] = useState<AccountData | null>(null);
 
+    const [loading, setLoading] = useState(true);
+
     useEffect(() => {
-        // Fetch real campaign data
-        const accountData = LS.get(KEY_DATA(ACCOUNT_ID), null);
-        if (accountData) {
-            setData(accountData);
-        } else {
-            router.push("/campaigns");
-        }
+        const fetchCampaign = async () => {
+            try {
+                if (!campaignId) return;
+                const campaign = await apiFetch(`/campaigns/${campaignId}`);
+
+                const banner = typeof campaign.creativeJson === 'string' ? JSON.parse(campaign.creativeJson) : campaign.creativeJson;
+                banner.id = campaign.id;
+                banner.name = campaign.name;
+                banner.status = campaign.status;
+                banner.type = campaign.type;
+
+                const rule = typeof campaign.rulesJson === 'string' ? JSON.parse(campaign.rulesJson) : campaign.rulesJson;
+                if (rule) rule.bannerId = campaign.id;
+
+                setData({
+                    accountId: campaign.accountId,
+                    banners: [banner],
+                    rules: rule ? [rule] : [defaultRules(campaign.id)],
+                    abTests: [],
+                    events: []
+                });
+            } catch (err) {
+                console.error("Preview load failed", err);
+                // router.push("/campaigns");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchCampaign();
     }, [campaignId, router]);
 
-    const banner = useMemo(() => {
-        return data?.banners.find(b => b.id === campaignId) || null;
-    }, [data, campaignId]);
+    const banner = data?.banners.find(b => b.id === campaignId);
 
     if (!data || !banner) {
         return <div className="p-8 text-center text-white">Loading campaign...</div>;

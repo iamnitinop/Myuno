@@ -31,8 +31,12 @@ function getOrCreateAccountData(accountId: string): AccountData {
 }
 
 export default function CampaignManager() {
-    // Hardcoded demo account for now
-    const accountId = "ACC_DEMO_001";
+    // Use real account ID
+    const [accountId, setAccountId] = useState("Loading...");
+
+    useEffect(() => {
+        setAccountId(LS.get("accountId", "ACC_DEMO_001"));
+    }, []);
 
     const [tab, setTab] = useState<"editor" | "targeting" | "publish">("editor");
     const [data, setData] = useState<AccountData | null>(null);
