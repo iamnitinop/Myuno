@@ -5,11 +5,8 @@ import { useRouter } from "next/navigation";
 import { templateLibrary, TemplateInfo } from "@/lib/templates";
 import { TemplateCard } from "@/components/features/templates/TemplateCard";
 import { AccountData, Banner } from "@/lib/types";
-import { LS } from "@/lib/utils";
-import { Search } from "lucide-react";
-import { defaultRules, KEY_DATA } from "@/lib/defaults";
-
-const ACCOUNT_ID = "ACC_DEMO_001"; // Hardcoded for demo parity
+import { defaultRules } from "@/lib/defaults";
+import { apiFetch } from "@/lib/api";
 
 export default function TemplatesPage() {
     const router = useRouter();
@@ -30,38 +27,31 @@ export default function TemplatesPage() {
         return matchesCategory && matchesSearch;
     });
 
-    const handleUseTemplate = (template: TemplateInfo) => {
-        // 1. Generate new banner from template
-        const newBanner = template.generator();
+    const handleUseTemplate = async (template: TemplateInfo) => {
+        try {
+            // 1. Generate new banner from template
+            const newBanner = template.generator();
+            const newRules = defaultRules(newBanner.id);
 
-        // 2. Get existing data
-        const currentData: AccountData | null = LS.get(KEY_DATA(ACCOUNT_ID), null);
+            // 2. Save to backend via API
+            const res = await apiFetch('/campaigns', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: template.name,
+                    type: newBanner.type,
+                    creativeJson: newBanner,
+                    rulesJson: newRules
+                })
+            });
 
-        // 3. Create initial structure if missing
-        const accountData: AccountData = currentData || {
-            accountId: ACCOUNT_ID,
-            banners: [],
-            rules: [],
-            abTests: [],
-            events: []
-        };
-
-        if (!accountData.banners) accountData.banners = [];
-        if (!accountData.rules) accountData.rules = [];
-        if (!accountData.abTests) accountData.abTests = [];
-        if (!accountData.events) accountData.events = [];
-
-        // 4. Add new banner
-        accountData.banners.push(newBanner);
-
-        // 5. Add default rules for this banner
-        accountData.rules.push(defaultRules(newBanner.id));
-
-        // 6. Save
-        LS.set(KEY_DATA(ACCOUNT_ID), accountData);
-
-        // 7. Redirect (Hard navigation to bypass cache)
-        window.location.href = `/campaigns/${newBanner.id}`;
+            if (res && res.id) {
+                // 3. Redirect to editor
+                router.push(`/campaigns/${res.id}`);
+            }
+        } catch (e) {
+            console.error("Failed to create campaign from template", e);
+            alert("Failed to create campaign from template");
+        }
     };
 
     const handlePreview = (template: TemplateInfo) => {

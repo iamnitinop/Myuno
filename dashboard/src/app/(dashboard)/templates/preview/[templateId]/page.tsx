@@ -5,12 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { templateLibrary } from "@/lib/templates";
 import { BannerRenderer } from "@/components/features/preview/BannerRenderer";
 import { AccountData, Banner, ViewConfig } from "@/lib/types";
-import { LS } from "@/lib/utils";
-import { defaultRules, KEY_DATA } from "@/lib/defaults";
+import { defaultRules } from "@/lib/defaults";
 import { Monitor, Smartphone, Tablet, X, Check, ArrowLeft } from "lucide-react";
 import { Pill } from "@/components/ui/Pill";
-
-const ACCOUNT_ID = "ACC_DEMO_001";
+import { apiFetch } from "@/lib/api";
 
 export default function TemplatePreviewPage() {
     const params = useParams();
