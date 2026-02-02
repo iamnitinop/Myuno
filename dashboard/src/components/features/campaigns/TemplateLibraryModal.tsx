@@ -3,10 +3,9 @@
 import { X } from "lucide-react";
 import { templateLibrary, TemplateInfo } from "@/lib/templates";
 import { useRouter } from "next/navigation";
-import { LS } from "@/lib/utils";
-import { AccountData } from "@/lib/types";
-import { defaultRules, KEY_DATA } from "@/lib/defaults";
+import { defaultRules } from "@/lib/defaults";
 import { BannerRenderer } from "@/components/features/preview/BannerRenderer";
+import { apiFetch } from "@/lib/api";
 
 interface TemplateLibraryModalProps {
     isOpen: boolean;
@@ -18,33 +17,32 @@ export function TemplateLibraryModal({ isOpen, onClose }: TemplateLibraryModalPr
 
     if (!isOpen) return null;
 
-    const handleUseTemplate = (template: TemplateInfo) => {
-        const accountId = "ACC_DEMO_001";
-        const data: AccountData = LS.get(KEY_DATA(accountId), {
-            accountId,
-            banners: [],
-            rules: [],
-            abTests: [],
-            events: [],
-        });
+    const handleUseTemplate = async (template: TemplateInfo) => {
+        try {
+            // Generate banner from template
+            const newBanner = template.generator();
+            const newRules = defaultRules(newBanner.id);
 
-        if (!data.banners) data.banners = [];
-        if (!data.rules) data.rules = [];
-        if (!data.abTests) data.abTests = [];
-        if (!data.events) data.events = [];
+            // Save to backend via API
+            const res = await apiFetch('/campaigns', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: template.name,
+                    type: newBanner.type,
+                    creativeJson: newBanner,
+                    rulesJson: newRules
+                })
+            });
 
-        // Generate banner from template
-        const newBanner = template.generator();
-        const newRules = defaultRules(newBanner.id);
-
-        data.banners.push(newBanner);
-        data.rules.push(newRules);
-
-        LS.set(KEY_DATA(accountId), data);
-
-        // Navigate to editor (Hard navigation to bypass cache)
-        window.location.href = `/campaigns/${newBanner.id}`;
-        onClose();
+            if (res && res.id) {
+                // Navigate to the created campaign
+                router.push(`/campaigns/${res.id}`);
+                onClose();
+            }
+        } catch (e) {
+            console.error("Failed to create campaign from template", e);
+            alert("Failed to create campaign from template");
+        }
     };
 
     const handlePreview = (template: TemplateInfo) => {
