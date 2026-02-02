@@ -28,28 +28,30 @@ export default function TemplatePreviewPage() {
 
     const currentView: ViewConfig = banner.views[device] || banner.views.desktop;
 
-    const handleUseTemplate = () => {
-        // Logic duplicated from TemplatesPage - ideally shared hook, but keeping simple for now
-        const currentData: AccountData | null = LS.get(KEY_DATA(ACCOUNT_ID), null);
-        const accountData: AccountData = currentData || {
-            accountId: ACCOUNT_ID,
-            banners: [],
-            rules: [],
-            abTests: [],
-            events: []
-        };
+    const handleUseTemplate = async () => {
+        if (!template || !banner) return;
 
-        if (!accountData.banners) accountData.banners = [];
-        if (!accountData.rules) accountData.rules = [];
-        if (!accountData.abTests) accountData.abTests = [];
-        if (!accountData.events) accountData.events = [];
+        try {
+            const newRules = defaultRules(banner.id);
 
-        accountData.banners.push(banner);
-        accountData.rules.push(defaultRules(banner.id));
-        LS.set(KEY_DATA(ACCOUNT_ID), accountData);
+            // Save to backend via API
+            const res = await apiFetch('/campaigns', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: template.name,
+                    type: banner.type,
+                    creativeJson: banner,
+                    rulesJson: newRules
+                })
+            });
 
-        // Force hard navigation to ensure fresh state read
-        window.location.href = `/campaigns/${banner.id}`;
+            if (res && res.id) {
+                router.push(`/campaigns/${res.id}`);
+            }
+        } catch (e) {
+            console.error("Failed to create campaign from template preview", e);
+            alert("Failed to create campaign");
+        }
     };
 
     return (
