@@ -30,6 +30,8 @@ export default function SignupPage() {
             LS.set("accessToken", data.accessToken);
             LS.set("refreshToken", data.refreshToken);
             LS.set("accountId", data.accountId);
+            LS.set("userEmail", email); // Store user email for profile
+            LS.set("userPlan", "Free Trial"); // Store initial plan info
             // Redirect to dashboard
             router.push("/");
         } catch (err: any) {
