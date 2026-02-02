@@ -7,6 +7,7 @@ import { TemplateCard } from "@/components/features/templates/TemplateCard";
 import { AccountData, Banner } from "@/lib/types";
 import { defaultRules } from "@/lib/defaults";
 import { apiFetch } from "@/lib/api";
+import { Search } from "lucide-react";
 
 export default function TemplatesPage() {
     const router = useRouter();
