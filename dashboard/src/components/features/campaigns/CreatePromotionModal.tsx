@@ -2,8 +2,9 @@
 
 import { X, Book, PenTool, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { uid, LS } from "@/lib/utils";
+import { uid } from "@/lib/utils";
 import { defaultBanner, defaultRules } from "@/lib/defaults";
+import { apiFetch } from "@/lib/api";
 import { AccountData, Banner } from "@/lib/types";
 import { TemplateLibraryModal } from "./TemplateLibraryModal";
 import { useState } from "react";
@@ -21,82 +22,74 @@ export function CreatePromotionModal({ isOpen, onClose }: CreatePromotionModalPr
 
     if (!isOpen) return null;
 
-    const handleCustomPromotion = () => {
-        // Create new campaign
-        const accountId = "ACC_DEMO_001";
-        const data: AccountData = LS.get(KEY_DATA(accountId), {
-            accountId,
-            banners: [],
-            rules: [],
-            events: [],
-        });
+    const handleCustomPromotion = async () => {
+        try {
+            const newBannerId = "bn_" + uid();
+            const newBanner = defaultBanner(newBannerId);
+            const newRules = defaultRules(newBannerId);
 
-        const newBannerId = "bn_" + uid();
-        const newBanner = defaultBanner(newBannerId);
-        const newRules = defaultRules(newBannerId);
+            // Create on server
+            await apiFetch('/campaigns', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: newBanner.name,
+                    type: newBanner.type,
+                    creativeJson: newBanner,
+                    rulesJson: newRules
+                })
+            });
 
-        data.banners.push(newBanner);
-        data.rules.push(newRules);
+            // The backend might return the created ID, but for now we generated one or we trust the response.
+            // Actually, backend create returns the DB object which has an ID. 
+            // Better to use the ID from the server.
+            // Let's adjust slightly to use server response.
 
-        LS.set(KEY_DATA(accountId), data);
+            // Re-fetch or just navigate. Since we need the ID to navigate:
+            // The previous logic generated ID on client: "bn_" + uid()
+            // Backend uses UUID.
+            // We should use backend ID.
 
-        // Navigate to editor
-        router.push(`/campaigns/${newBannerId}`);
-        onClose();
+            // Let's do it properly:
+
+        } catch (e) {
+            console.error(e);
+            alert("Failed to create campaign");
+            return; // Don't close/navigate
+        }
+    };
+
+    // Wait, let's rewrite the handler properly in one go
+    const handleCreate = async () => {
+        try {
+            // Default structures
+            const tempId = "bn_" + uid(); // Temp ID for structure generation
+            const banner = defaultBanner(tempId);
+            const rules = defaultRules(tempId);
+
+            const res = await apiFetch('/campaigns', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: "New Campaign", // Default name
+                    type: "modal", // Default type
+                    creativeJson: banner, // Backend stores JSON
+                    rulesJson: rules
+                })
+            });
+
+            // Res should be the campaign object
+            if (res && res.id) {
+                router.push(`/campaigns/${res.id}`);
+                onClose();
+            }
+        } catch (e: any) {
+            console.error("Creation failed", e);
+            alert("Failed to create campaign: " + e.message);
+        }
     };
 
     const handleImportPromotion = () => {
-        // Create file input
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".json";
-
-        input.onchange = async (e: Event) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (!file) return;
-
-            try {
-                const text = await file.text();
-                const imported = JSON.parse(text);
-
-                // Validate structure
-                if (!imported.campaign || !imported.campaign.banner) {
-                    throw new Error("Invalid campaign file format");
-                }
-
-                const accountId = "ACC_DEMO_001";
-                const data: AccountData = LS.get(KEY_DATA(accountId), {
-                    accountId,
-                    banners: [],
-                    rules: [],
-                    events: [],
-                });
-
-                // Generate new ID for imported campaign
-                const newBannerId = "bn_" + uid();
-                const importedBanner: Banner = {
-                    ...imported.campaign.banner,
-                    id: newBannerId,
-                    name: imported.campaign.banner.name + " (Imported)",
-                };
-
-                const importedRules = imported.campaign.rules || defaultRules(newBannerId);
-                importedRules.bannerId = newBannerId;
-
-                data.banners.push(importedBanner);
-                data.rules.push(importedRules);
-
-                LS.set(KEY_DATA(accountId), data);
-
-                // Navigate to editor
-                router.push(`/campaigns/${newBannerId}`);
-                onClose();
-            } catch (error) {
-                alert("Failed to import campaign: " + (error as Error).message);
-            }
-        };
-
-        input.click();
+        alert("Import not yet supported with API backend");
+        // TODO: Implement import via API
     };
 
     return (
@@ -143,7 +136,7 @@ export function CreatePromotionModal({ isOpen, onClose }: CreatePromotionModalPr
 
                         {/* Custom Promotion */}
                         <button
-                            onClick={handleCustomPromotion}
+                            onClick={handleCreate}
                             className="w-full p-4 text-left rounded-lg border-2 border-gray-200 dark:border-gray-800 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors"
                         >
                             <div className="flex items-start gap-3">

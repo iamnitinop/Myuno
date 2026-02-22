@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtGuard } from '../auth/jwt.guard';
 import { CampaignsService } from './campaigns.service';
 import { CreateCampaignDto, UpdateCampaignDto } from './dto';
@@ -26,5 +26,10 @@ export class CampaignsController {
     @Patch(':id')
     update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateCampaignDto) {
         return this.svc.update(req.user.accountId, id, dto);
+    }
+
+    @Delete(':id')
+    remove(@Req() req: any, @Param('id') id: string) {
+        return this.svc.delete(req.user.accountId, id);
     }
 }

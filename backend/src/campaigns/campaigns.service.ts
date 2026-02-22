@@ -41,4 +41,9 @@ export class CampaignsService {
             },
         });
     }
+
+    async delete(accountId: string, id: string) {
+        await this.get(accountId, id); // ensure exists and belongs to account
+        return this.prisma.campaign.delete({ where: { id } });
+    }
 }

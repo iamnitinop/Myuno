@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -13,6 +15,10 @@ import { EmailCaptureModule } from './email-capture/email-capture.module';
 
 @Module({
   imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, 'public', 'public'),
+      serveRoot: '/', // Served at root level so /vck.js works
+    }),
     PrismaModule,
     AuthModule,
     AccountsModule,

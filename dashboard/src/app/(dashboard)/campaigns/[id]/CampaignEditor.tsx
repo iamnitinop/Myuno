@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { uid, LS } from "@/lib/utils";
-import { defaultBanner, defaultRules, KEY_DATA } from "@/lib/defaults";
+import { defaultBanner, defaultRules } from "@/lib/defaults";
 import { AccountData, Banner, TargetingRules, AdvancedTargetingRules } from "@/lib/types";
 import { VisualEditor } from "@/components/features/editor/visual/VisualEditor";
 import { RuleBuilder } from "@/components/features/rules";
@@ -15,54 +15,57 @@ import { Card } from "@/components/ui/Card";
 import { ensureAdvancedRules } from "@/lib/rule-migration";
 import { ArrowLeft, Pencil, Check, X, Eye } from "lucide-react";
 import Link from "next/link";
-
-
-
-function getOrCreateAccountData(accountId: string): AccountData {
-    const existing = LS.get(KEY_DATA(accountId), null);
-    if (existing) return existing;
-    const bannerId = "bn_" + uid();
-    const data: AccountData = {
-        accountId,
-        banners: [defaultBanner(bannerId)],
-        rules: [defaultRules(bannerId)],
-        abTests: [],
-        events: [],
-    };
-    LS.set(KEY_DATA(accountId), data);
-    return data;
-}
+import { apiFetch } from "@/lib/api";
 
 export default function CampaignEditor({ campaignId }: { campaignId: string }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const initialTab = (searchParams?.get("tab") as "editor" | "targeting" | "publish") || "editor";
 
-    const accountId = "ACC_DEMO_001";
     const [tab, setTab] = useState<"editor" | "targeting" | "publish">(initialTab);
     const [data, setData] = useState<AccountData | null>(null);
     const [isEditingName, setIsEditingName] = useState(false);
     const [editedName, setEditedName] = useState("");
     const [showToast, setShowToast] = useState(false);
+    const [accountId, setAccountId] = useState("Loading...");
 
+    // Fetch Campaign Data
     useEffect(() => {
-        const accountData = getOrCreateAccountData(accountId);
-        const campaignExists = accountData.banners.some(b => b.id === campaignId);
+        const loadCampaign = async () => {
+            try {
+                const campaign = await apiFetch(`/campaigns/${campaignId}`);
 
-        if (!campaignExists) {
-            router.push("/campaigns");
-            return;
-        }
+                // Map to AccountData structure expected by children
+                const banner = typeof campaign.creativeJson === 'string' ? JSON.parse(campaign.creativeJson) : campaign.creativeJson;
+                banner.id = campaign.id;
+                banner.name = campaign.name;
+                banner.status = campaign.status;
+                banner.type = campaign.type;
 
-        setData(accountData);
+                const rule = typeof campaign.rulesJson === 'string' ? JSON.parse(campaign.rulesJson) : campaign.rulesJson;
+                if (rule) rule.bannerId = campaign.id;
+
+                setData({
+                    accountId: campaign.accountId,
+                    banners: [banner],
+                    rules: rule ? [rule] : [defaultRules(campaign.id)],
+                    abTests: [],
+                    events: []
+                });
+                setAccountId(campaign.accountId);
+            } catch (e) {
+                console.error("Failed to load campaign", e);
+                // router.push("/campaigns"); // Redirect if not found
+            }
+        };
+        loadCampaign();
     }, [campaignId, router]);
 
     if (!data) return <div>Loading...</div>;
 
     const banner = data.banners.find(b => b.id === campaignId);
     if (!banner) {
-        router.push("/campaigns");
-        return null;
+        return <div>Campaign not found in loaded data</div>;
     }
 
     const rawRules = data.rules.find((r) => r.bannerId === banner.id) || defaultRules(banner.id);
@@ -72,17 +75,38 @@ export default function CampaignEditor({ campaignId }: { campaignId: string }) {
     const isAdvancedTargeting = banner.views.desktop.layers.some(l => l.type === 'email_form') ||
         (banner.views.mobile?.layers.some(l => l.type === 'email_form') ?? false);
 
+    // Save logic
+    const saveToServer = async (nextData: AccountData) => {
+        // Optimistic update
+        setData(nextData);
+
+        const nextBanner = nextData.banners[0];
+        const nextRules = nextData.rules[0];
+
+        try {
+            await apiFetch(`/campaigns/${campaignId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    name: nextBanner.name,
+                    creativeJson: nextBanner,
+                    rulesJson: nextRules
+                })
+            });
+        } catch (e) {
+            console.error("Save failed", e);
+            // Optionally show error toast
+        }
+    };
+
     // Auto-save (no toast)
     const autoSave = (next: AccountData) => {
-        setData(next);
-        LS.set(KEY_DATA(accountId), next);
+        saveToServer(next);
     };
 
     // Manual save (with toast)
-    const manualSave = () => {
+    const manualSave = async () => {
         if (!data) return;
-        setData(data);
-        LS.set(KEY_DATA(accountId), data);
+        await saveToServer(data);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
     };
@@ -90,33 +114,57 @@ export default function CampaignEditor({ campaignId }: { campaignId: string }) {
     const updateBanner = (nextBanner: Banner) => {
         const next = {
             ...data,
-            banners: data.banners.map((b) => (b.id === banner.id ? nextBanner : b)),
+            banners: [nextBanner],
         };
         autoSave(next);
     };
 
     const updateRules = (nextRules: AdvancedTargetingRules) => {
+        // Fix: ensure bannerId is correct in rules
+        const fixedRules = { ...nextRules, bannerId: banner.id };
         const next = {
             ...data,
-            rules: data.rules.map((r) => (r.bannerId === banner.id ? nextRules : r)),
+            rules: [fixedRules],
         };
         autoSave(next);
     };
 
-    const publish = () => {
-        const next = {
-            ...data,
-            banners: data.banners.map((b) => (b.id === banner.id ? { ...b, status: "published" } as const : b)),
-        };
-        autoSave(next);
+    const publish = async () => {
+        try {
+            const nextBanner = { ...banner, status: "published" as const };
+            const next = {
+                ...data,
+                banners: [nextBanner],
+            };
+
+            // Call dedicated publishing service (creates R2 snapshots)
+            await apiFetch(`/publish/${campaignId}`, {
+                method: 'POST'
+            });
+
+            setData(next);
+        } catch (e) {
+            console.error("Publish failed", e);
+        }
     };
 
-    const unpublish = () => {
-        const next = {
-            ...data,
-            banners: data.banners.map((b) => (b.id === banner.id ? { ...b, status: "draft" } as const : b)),
-        };
-        autoSave(next);
+    const unpublish = async () => {
+        try {
+            const nextBanner = { ...banner, status: "draft" as const };
+            const next = {
+                ...data,
+                banners: [nextBanner],
+            };
+
+            // Call dedicated unpublish service
+            await apiFetch(`/publish/${campaignId}/unpublish`, {
+                method: 'POST'
+            });
+
+            setData(next);
+        } catch (e) {
+            console.error("Unpublish failed", e);
+        }
     };
 
     const startEditingName = () => {

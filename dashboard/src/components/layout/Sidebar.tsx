@@ -137,7 +137,10 @@ export default function Sidebar() {
                                     <button className="p-3 text-left text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-colors">
                                         Manage Plan
                                     </button>
-                                    <button className="p-3 text-left text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-colors">
+                                    <button
+                                        onClick={() => { router.push("/embed-code"); setShowProfileMenu(false); }}
+                                        className="p-3 text-left text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                                    >
                                         Embed Code
                                     </button>
                                     <button className="p-3 text-left text-sm text-gray-300 hover:bg-gray-800 rounded-lg transition-colors">

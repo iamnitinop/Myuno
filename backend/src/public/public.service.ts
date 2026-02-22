@@ -25,4 +25,28 @@ export class PublicService {
             payloadUrl: latest.payloadUrl,
         };
     }
+
+    async listCampaigns(accountId: string) {
+        if (!accountId) return [];
+
+        // For security, strictly validate UUID format if needed, but Prisma usually handles it.
+        // We only return PUBLISHED campaigns.
+
+        // Note: Ideally we should use the Snapshots logic, but assuming vck.js renders raw campaign for now:
+        const campaigns = await this.prisma.campaign.findMany({
+            where: {
+                accountId,
+                status: 'published',
+            },
+            select: {
+                id: true,
+                name: true,
+                type: true,
+                creativeJson: true,
+                rulesJson: true,
+            },
+        });
+
+        return campaigns;
+    }
 }

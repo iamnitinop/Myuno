@@ -1,4 +1,7 @@
-export const API_URL = "https://web-production-75bfb.up.railway.app";
+import { LS } from "@/lib/utils";
+
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://web-production-75bfb.up.railway.app";
+// export const API_URL = "http://localhost:3001";
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     const headers = {
@@ -6,7 +9,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
         ...options.headers,
     };
 
-    const token = localStorage.getItem("accessToken");
+    const token = LS.get("accessToken", null);
     if (token) {
         // @ts-ignore
         headers["Authorization"] = `Bearer ${token}`;

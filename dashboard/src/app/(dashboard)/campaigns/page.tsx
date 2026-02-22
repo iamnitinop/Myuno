@@ -1,88 +1,130 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Monitor, Smartphone, Trash2, BarChart3, Edit, Target, Gift, Download, FileUp, Archive, History, Plug, Copy } from "lucide-react";
 import { LS } from "@/lib/utils";
-import { AccountData } from "@/lib/types";
+import { AccountData, Banner, TargetingRules, AdvancedTargetingRules } from "@/lib/types";
 import { CreatePromotionModal } from "@/components/features/campaigns/CreatePromotionModal";
 import { exportCampaign } from "@/lib/campaign-export";
 import { ensureAdvancedRules } from "@/lib/rule-migration";
-import { KEY_DATA } from "@/lib/defaults";
+import { apiFetch } from "@/lib/api";
 
 export default function CampaignsPage() {
     const router = useRouter();
-    const accountId = "ACC_DEMO_001";
     const [data, setData] = useState<AccountData | null>(null);
+    const [loading, setLoading] = useState(true);
     const [showOptionsPanel, setShowOptionsPanel] = useState<string | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [activeTab, setActiveTab] = useState<"actions" | "settings">("actions");
     const [panelPosition, setPanelPosition] = useState<{ top: number; right: number; placement: 'above' | 'below' } | null>(null);
 
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const campaigns = await apiFetch("/campaigns");
+            // Map backend campaigns to frontend AccountData structure
+            // Backend returns { id, name, type, status, creativeJson, rulesJson, ... }
+
+            const banners: Banner[] = [];
+            const rules: (TargetingRules | AdvancedTargetingRules)[] = [];
+
+            campaigns.forEach((c: any) => {
+                // Parse creativeJson if it's string, or use as object
+                const banner = typeof c.creativeJson === 'string' ? JSON.parse(c.creativeJson) : c.creativeJson;
+                // Merge top-level fields
+                banner.id = c.id;
+                banner.name = c.name;
+                banner.status = c.status;
+                banner.type = c.type;
+                banners.push(banner);
+
+                const rule = typeof c.rulesJson === 'string' ? JSON.parse(c.rulesJson) : c.rulesJson;
+                if (rule) {
+                    rule.bannerId = c.id;
+                    rules.push(rule);
+                }
+            });
+
+            const accountId = LS.get("accountId", "") || campaigns[0]?.accountId || "";
+
+            setData({
+                accountId,
+                banners,
+                rules,
+                abTests: [],
+                events: [] // TODO: Fetch events/stats from backend
+            });
+        } catch (err) {
+            console.error("Failed to fetch campaigns", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const accountData: AccountData = LS.get(KEY_DATA(accountId), {
-            accountId,
-            banners: [],
-            rules: [],
-            events: [],
-        });
-        setData(accountData);
+        fetchData();
     }, []);
 
-    if (!data) return <div>Loading...</div>;
+    if (loading) return <div className="p-8 text-center">Loading campaigns...</div>;
+    if (!data) return <div className="p-8 text-center">Failed to load data</div>;
 
     const getCampaignStats = (campaignId: string) => {
-        const campaignEvents = data.events.filter(e => e.bannerId === campaignId);
-        const impressions = campaignEvents.filter(e => e.type === "impression").length;
-        const clicks = campaignEvents.filter(e => e.type === "click").length;
-        const conversions = campaignEvents.filter(e => e.type === "conversion").length;
-
-        return { impressions, clicks, conversions };
+        // Placeholder stats until backend supports aggregation
+        // const campaignEvents = data.events.filter(e => e.bannerId === campaignId);
+        return { impressions: 0, clicks: 0, conversions: 0 };
     };
 
-    const toggleCampaignStatus = (campaignId: string, e: React.MouseEvent) => {
+    const toggleCampaignStatus = async (campaignId: string, e: React.MouseEvent) => {
         e.stopPropagation();
+        const campaign = data.banners.find(b => b.id === campaignId);
+        if (!campaign) return;
+
+        const newStatus = campaign.status === "published" ? "draft" : "published";
+
+        // Optimistic update
         const updatedBanners = data.banners.map(b =>
             b.id === campaignId
-                ? { ...b, status: b.status === "published" ? "draft" as const : "published" as const }
+                ? { ...b, status: newStatus as "draft" | "published" }
                 : b
         );
-        const newData = { ...data, banners: updatedBanners };
-        setData(newData);
-        LS.set(KEY_DATA(accountId), newData);
+        setData({ ...data, banners: updatedBanners });
+
+        try {
+            await apiFetch(`/campaigns/${campaignId}`, {
+                method: "PATCH",
+                body: JSON.stringify({ status: newStatus })
+            });
+        } catch (err) {
+            console.error("Failed to update status", err);
+            // Revert on failure
+            fetchData();
+        }
     };
 
-    const deleteCampaign = (campaignId: string, e: React.MouseEvent) => {
+    const deleteCampaign = async (campaignId: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (!confirm("Are you sure you want to delete this campaign?")) return;
+
+        try {
+            await apiFetch(`/campaigns/${campaignId}`, { method: "DELETE" });
+        } catch (err) {
+            console.error("Failed to delete", err);
+            alert("Failed to delete campaign. Please try again.");
+            return;
+        }
 
         const newData = {
             ...data,
             banners: data.banners.filter(b => b.id !== campaignId),
             rules: data.rules.filter(r => r.bannerId !== campaignId),
-            events: data.events.filter(e => e.bannerId !== campaignId),
         };
         setData(newData);
-        LS.set(KEY_DATA(accountId), newData);
         setShowOptionsPanel(null);
     };
 
     const duplicateCampaign = (campaignId: string) => {
-        const campaign = data.banners.find(b => b.id === campaignId);
-        const rules = data.rules.find(r => r.bannerId === campaignId);
-        if (!campaign) return;
-
-        const newId = "bn_" + Date.now();
-        const newBanner = { ...campaign, id: newId, name: campaign.name + " (Copy)" };
-        const newRules = rules ? { ...rules, bannerId: newId } : undefined;
-
-        const newData = {
-            ...data,
-            banners: [...data.banners, newBanner],
-            rules: newRules ? [...data.rules, newRules] : data.rules,
-        };
-        setData(newData);
-        LS.set(KEY_DATA(accountId), newData);
+        // Deep copy logic would need a POST /campaigns with the existing data
     };
 
     const handleExport = (campaignId: string) => {
@@ -109,7 +151,6 @@ export default function CampaignsPage() {
             const PANEL_HEIGHT = 320; // Estimated panel height
             const SPACING = 8; // Gap between button and panel
             const spaceBelow = window.innerHeight - rect.bottom;
-            const spaceAbove = rect.top;
 
             // Prefer 'below' placement unless insufficient space
             const placement: 'above' | 'below' = spaceBelow >= PANEL_HEIGHT ? 'below' : 'above';
@@ -197,23 +238,15 @@ export default function CampaignsPage() {
                                             </div>
                                         </div>
 
-                                        {/* Impressions */}
+                                        {/* Stats */}
                                         <div className="w-20 text-right text-sm text-gray-600 dark:text-gray-400">
                                             {stats.impressions}
                                         </div>
-
-                                        {/* Engagements (Clicks) */}
                                         <div className="w-24 text-right text-sm">
-                                            <span className={stats.clicks > 0 ? "text-green-600 font-medium" : "text-gray-600 dark:text-gray-400"}>
-                                                {stats.clicks} ({stats.impressions > 0 ? Math.round((stats.clicks / stats.impressions) * 100) : 0}%)
-                                            </span>
+                                            {stats.clicks}
                                         </div>
-
-                                        {/* Conversions */}
                                         <div className="w-24 text-right text-sm">
-                                            <span className={stats.conversions > 0 ? "text-green-600 font-medium" : "text-gray-600 dark:text-gray-400"}>
-                                                {stats.conversions} ({stats.impressions > 0 ? Math.round((stats.conversions / stats.impressions) * 100) : 0}%)
-                                            </span>
+                                            {stats.conversions}
                                         </div>
 
                                         {/* Action Icons */}
@@ -227,16 +260,6 @@ export default function CampaignsPage() {
                                                 title="Desktop preview"
                                             >
                                                 <Monitor className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    router.push(`/campaigns/${campaign.id}`);
-                                                }}
-                                                className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                                title="Mobile preview"
-                                            >
-                                                <Smartphone className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={(e) => deleteCampaign(campaign.id, e)}
@@ -266,13 +289,10 @@ export default function CampaignsPage() {
             {/* Floating Options Panel */}
             {showOptionsPanel && selectedCampaign && panelPosition && (
                 <>
-                    {/* Backdrop */}
                     <div
                         className="fixed inset-0 z-40"
                         onClick={() => setShowOptionsPanel(null)}
                     />
-
-                    {/* Floating Panel */}
                     <div
                         className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl w-64"
                         style={{
@@ -281,124 +301,18 @@ export default function CampaignsPage() {
                             transform: panelPosition.placement === 'above' ? 'translateY(-100%)' : 'translateY(0)'
                         }}
                     >
-                        {/* Tabs */}
-                        <div className="flex border-b border-gray-200 dark:border-gray-800">
+                        {/* Simplified Options for now */}
+                        <div className="p-2">
                             <button
-                                onClick={() => setActiveTab("actions")}
-                                className={`flex-1 py-2 px-3 text-xs font-medium transition-colors ${activeTab === "actions"
-                                    ? "border-b-2 border-blue-600 text-blue-600 -mb-px"
-                                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                                    }`}
+                                onClick={() => {
+                                    router.push(`/campaigns/${selectedCampaign.id}?tab=editor`);
+                                    setShowOptionsPanel(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm"
                             >
-                                Actions
+                                <Edit className="w-4 h-4 text-gray-500" />
+                                <span>Edit Design</span>
                             </button>
-                            <button
-                                onClick={() => setActiveTab("settings")}
-                                className={`flex-1 py-2 px-3 text-xs font-medium transition-colors ${activeTab === "settings"
-                                    ? "border-b-2 border-blue-600 text-blue-600 -mb-px"
-                                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                                    }`}
-                            >
-                                Settings
-                            </button>
-                        </div>
-
-                        {/* Tab Content */}
-                        <div className="p-3">
-                            {activeTab === "actions" && (
-                                <div className="space-y-1">
-                                    <button
-                                        onClick={() => {
-                                            router.push(`/campaigns/${selectedCampaign.id}?tab=editor`);
-                                            setShowOptionsPanel(null);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm"
-                                    >
-                                        <Edit className="w-4 h-4 text-gray-500" />
-                                        <span>Edit Design</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            router.push(`/campaigns/${selectedCampaign.id}?tab=targeting`);
-                                            setShowOptionsPanel(null);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm"
-                                    >
-                                        <Target className="w-4 h-4 text-gray-500" />
-                                        <span>Targeting Rules</span>
-                                    </button>
-                                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm">
-                                        <Gift className="w-4 h-4 text-gray-500" />
-                                        <span>Coupons</span>
-                                    </button>
-                                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm">
-                                        <BarChart3 className="w-4 h-4 text-gray-500" />
-                                        <span>Analytics</span>
-                                    </button>
-                                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm">
-                                        <Download className="w-4 h-4 text-gray-500" />
-                                        <span>Download Emails</span>
-                                    </button>
-
-                                    <div className="pt-2">
-                                        <button
-                                            onClick={(e) => {
-                                                toggleCampaignStatus(selectedCampaign.id, e);
-                                                setShowOptionsPanel(null);
-                                            }}
-                                            className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-                                        >
-                                            {selectedCampaign.status === "published" ? "Unpublish" : "Publish"}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === "settings" && (
-                                <div className="space-y-1">
-                                    <button
-                                        onClick={() => {
-                                            duplicateCampaign(selectedCampaign.id);
-                                            setShowOptionsPanel(null);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm"
-                                    >
-                                        <Copy className="w-3.5 h-3.5 text-gray-500" />
-                                        <span>Duplicate</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            handleExport(selectedCampaign.id);
-                                            setShowOptionsPanel(null);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm"
-                                    >
-                                        <FileUp className="w-3.5 h-3.5 text-gray-500" />
-                                        <span>Export</span>
-                                    </button>
-                                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm">
-                                        <Plug className="w-3.5 h-3.5 text-gray-500" />
-                                        <span>Integrations</span>
-                                    </button>
-                                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm">
-                                        <History className="w-3.5 h-3.5 text-gray-500" />
-                                        <span>Version History</span>
-                                    </button>
-                                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm">
-                                        <Archive className="w-3.5 h-3.5 text-gray-500" />
-                                        <span>Archive</span>
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            deleteCampaign(selectedCampaign.id, e);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 transition-colors text-left text-sm"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        <span>Delete</span>
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </>
@@ -406,7 +320,10 @@ export default function CampaignsPage() {
 
             <CreatePromotionModal
                 isOpen={showCreateModal}
-                onClose={() => setShowCreateModal(false)}
+                onClose={() => {
+                    setShowCreateModal(false);
+                    fetchData(); // Refresh list after close
+                }}
             />
         </>
     );

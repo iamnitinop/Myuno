@@ -1,35 +1,37 @@
 "use client";
 
 import { Bell, Search } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LS } from "@/lib/utils";
-import { AccountData } from "@/lib/types";
+import { apiFetch } from "@/lib/api";
 
 export default function Header() {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
+    const [allCampaigns, setAllCampaigns] = useState<any[]>([]);
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [showResults, setShowResults] = useState(false);
 
+    // Pre-fetch campaigns once for instant search
+    useEffect(() => {
+        apiFetch("/campaigns")
+            .then((data) => setAllCampaigns(data || []))
+            .catch(() => { }); // silent fail — search just won't work
+    }, []);
+
     useEffect(() => {
         if (searchQuery.trim()) {
-            // Get account data and filter campaigns
-            const accountId = "ACC_DEMO_001";
-            const data: AccountData | null = LS.get(`demo_account_${accountId}_data_v3`, null);
-
-            if (data && data.banners) {
-                const filtered = data.banners.filter(banner =>
-                    banner.name.toLowerCase().includes(searchQuery.toLowerCase())
-                );
-                setSearchResults(filtered);
-                setShowResults(true);
-            }
+            const q = searchQuery.toLowerCase();
+            const filtered = allCampaigns.filter((c) =>
+                c.name.toLowerCase().includes(q)
+            );
+            setSearchResults(filtered);
+            setShowResults(true);
         } else {
             setSearchResults([]);
             setShowResults(false);
         }
-    }, [searchQuery]);
+    }, [searchQuery, allCampaigns]);
 
     const handleSelectCampaign = (campaignId: string) => {
         router.push(`/campaigns/${campaignId}`);
