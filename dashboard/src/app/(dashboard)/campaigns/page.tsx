@@ -301,18 +301,53 @@ export default function CampaignsPage() {
                             transform: panelPosition.placement === 'above' ? 'translateY(-100%)' : 'translateY(0)'
                         }}
                     >
-                        {/* Simplified Options for now */}
-                        <div className="p-2">
+                        <div className="flex border-b border-gray-200 dark:border-gray-800">
                             <button
-                                onClick={() => {
-                                    router.push(`/campaigns/${selectedCampaign.id}?tab=editor`);
-                                    setShowOptionsPanel(null);
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left text-sm"
+                                className={`flex-1 py-1.5 text-xs font-medium ${activeTab === 'actions' ? 'text-gray-900 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={(e) => { e.stopPropagation(); setActiveTab('actions'); }}
                             >
-                                <Edit className="w-4 h-4 text-gray-500" />
-                                <span>Edit Design</span>
+                                Actions
                             </button>
+                            <button
+                                className={`flex-1 py-1.5 text-xs font-medium ${activeTab === 'settings' ? 'text-gray-900 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={(e) => { e.stopPropagation(); setActiveTab('settings'); }}
+                            >
+                                More
+                            </button>
+                        </div>
+
+                        <div className="p-1 max-h-64 overflow-y-auto">
+                            {activeTab === 'actions' ? (
+                                <>
+                                    <button onClick={() => { router.push(`/campaigns/${selectedCampaign.id}?tab=editor`); setShowOptionsPanel(null); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center gap-2">
+                                        <Edit className="w-4 h-4 text-blue-500" /> Edit Design
+                                    </button>
+                                    <button onClick={() => { router.push(`/campaigns/${selectedCampaign.id}?tab=rules`); setShowOptionsPanel(null); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center gap-2">
+                                        <Target className="w-4 h-4 text-purple-500" /> Advanced Rules
+                                    </button>
+                                    <button onClick={() => { router.push(`/campaigns/${selectedCampaign.id}?tab=publish`); setShowOptionsPanel(null); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center gap-2">
+                                        <FileUp className="w-4 h-4 text-green-500" /> Publish Status
+                                    </button>
+                                    <div className="h-px bg-gray-200 dark:bg-gray-800 my-1 mx-2" />
+                                    <button onClick={(e) => { e.stopPropagation(); toggleCampaignStatus(selectedCampaign.id, e); setShowOptionsPanel(null); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center gap-2">
+                                        {selectedCampaign.status === 'published' ? <Archive className="w-4 h-4 text-gray-500" /> : <Monitor className="w-4 h-4 text-green-500" />}
+                                        {selectedCampaign.status === 'published' ? 'Unpublish' : 'Publish'}
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button onClick={(e) => { e.stopPropagation(); duplicateCampaign(selectedCampaign.id); setShowOptionsPanel(null); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center gap-2">
+                                        <Copy className="w-4 h-4 text-gray-500" /> Duplicate
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleExport(selectedCampaign.id); setShowOptionsPanel(null); }} className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center gap-2">
+                                        <Download className="w-4 h-4 text-gray-500" /> Export JSON
+                                    </button>
+                                    <div className="h-px bg-gray-200 dark:bg-gray-800 my-1 mx-2" />
+                                    <button onClick={(e) => { e.stopPropagation(); deleteCampaign(selectedCampaign.id, e); }} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded flex items-center gap-2">
+                                        <Trash2 className="w-4 h-4 text-red-500" /> Delete Campaign
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </>
