@@ -15,7 +15,10 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
         headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_URL}${endpoint}`, {
+    const baseUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+    const res = await fetch(`${baseUrl}${path}`, {
         ...options,
         headers,
     });
