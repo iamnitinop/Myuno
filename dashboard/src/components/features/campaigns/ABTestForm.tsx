@@ -63,8 +63,7 @@ export function ABTestForm({ initialData, onSave }: ABTestFormProps) {
     }, [initialData]);
 
     if (!data) return <div>Loading...</div>;
-
-    const availablePromotions = data.banners.filter(b => true); // All banners
+    const availablePromotions = data.banners.filter(b => b.status === "published"); // Only published banners
 
     const handleSaveInternal = () => {
         if (!name) return alert("Please enter a test name");

@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Monitor, Smartphone, Trash2, BarChart3, Edit, Target, Gift, Download, FileUp, Archive, History, Plug, Copy } from "lucide-react";
-import { LS } from "@/lib/utils";
+import { LS, uid } from "@/lib/utils";
+import { defaultRules } from "@/lib/defaults";
 import { AccountData, Banner, TargetingRules, AdvancedTargetingRules } from "@/lib/types";
 import { CreatePromotionModal } from "@/components/features/campaigns/CreatePromotionModal";
 import { exportCampaign } from "@/lib/campaign-export";
@@ -123,8 +124,40 @@ export default function CampaignsPage() {
         setShowOptionsPanel(null);
     };
 
-    const duplicateCampaign = (campaignId: string) => {
-        // Deep copy logic would need a POST /campaigns with the existing data
+    const duplicateCampaign = async (campaignId: string) => {
+        const banner = data?.banners.find(b => b.id === campaignId);
+        const rules = data?.rules.find(r => r.bannerId === campaignId);
+        if (!banner) return;
+
+        try {
+            // Deep copy the banner
+            const duplicatedBanner = JSON.parse(JSON.stringify(banner));
+            duplicatedBanner.id = "bn_" + uid();
+            duplicatedBanner.name = `${duplicatedBanner.name} (Copy)`;
+            duplicatedBanner.status = "draft"; // Duplicates start as draft
+
+            let duplicatedRules = null;
+            if (rules) {
+                duplicatedRules = JSON.parse(JSON.stringify(rules));
+                duplicatedRules.bannerId = duplicatedBanner.id;
+            }
+
+            await apiFetch('/campaigns', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: duplicatedBanner.name,
+                    type: duplicatedBanner.type || 'modal',
+                    creativeJson: duplicatedBanner,
+                    rulesJson: duplicatedRules || defaultRules(duplicatedBanner.id)
+                })
+            });
+
+            // Refresh the list
+            fetchData();
+        } catch (err) {
+            console.error("Failed to duplicate campaign", err);
+            alert("Failed to duplicate campaign");
+        }
     };
 
     const handleExport = (campaignId: string) => {

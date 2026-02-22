@@ -88,8 +88,54 @@ export function CreatePromotionModal({ isOpen, onClose }: CreatePromotionModalPr
     };
 
     const handleImportPromotion = () => {
-        alert("Import not yet supported with API backend");
-        // TODO: Implement import via API
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const jsonString = event.target?.result as string;
+                    const parsedData = JSON.parse(jsonString);
+                    const { validateCampaignImport } = await import("@/lib/campaign-export");
+                    const validated = validateCampaignImport(parsedData);
+
+                    const { banner, rules } = validated.campaign;
+
+                    // Generate new ID and append "(Imported)" to avoid conflicts
+                    const originalId = banner.id;
+                    banner.id = "bn_" + uid();
+                    banner.name = `${banner.name} (Imported)`;
+                    if (rules) {
+                        rules.bannerId = banner.id;
+                        // It's also possible rules have matching IDs internally, but basic structure is fine
+                    }
+
+                    const res = await apiFetch('/campaigns', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            name: banner.name,
+                            type: banner.type || 'modal',
+                            creativeJson: banner,
+                            rulesJson: rules
+                        })
+                    });
+
+                    if (res && res.id) {
+                        router.push(`/campaigns/${res.id}?tab=editor`);
+                        onClose();
+                    }
+                } catch (err: any) {
+                    console.error("Import failed", err);
+                    alert("Failed to import campaign: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
     };
 
     return (
