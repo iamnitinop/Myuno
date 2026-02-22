@@ -17,6 +17,7 @@ model Account {
   stores    Store[]
   campaigns Campaign[]
   events    EventRaw[]
+  abTests   ABTest[]
 }
 
 model User {
@@ -106,4 +107,21 @@ model EmailCapture {
   @@index([campaignId])
   @@index([email])
   @@index([createdAt])
+}
+
+model ABTest {
+  id                 String   @id @default(uuid())
+  accountId          String
+  name               String
+  device             String   // desktop, mobile
+  startDate          DateTime
+  endDate            DateTime
+  baselineId         String
+  baselinePercentage Float
+  variants           Json     // JSON array of variant objects
+  status             String   @default("draft") // draft, scheduled, running, ended
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  account            Account  @relation(fields: [accountId], references: [id])
 }

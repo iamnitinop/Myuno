@@ -13,6 +13,8 @@ import { EventsModule } from './events/events.module';
 import { PublishModule } from './publish/publish.module';
 import { EmailCaptureModule } from './email-capture/email-capture.module';
 
+import { AbTestsModule } from './ab-tests/ab-tests.module';
+
 @Module({
   imports: [
     ServeStaticModule.forRoot({
@@ -28,8 +30,10 @@ import { EmailCaptureModule } from './email-capture/email-capture.module';
     EventsModule,
     PublishModule,
     EmailCaptureModule,
+    AbTestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
+
 export class AppModule { }

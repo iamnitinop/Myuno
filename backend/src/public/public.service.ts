@@ -27,12 +27,8 @@ export class PublicService {
     }
 
     async listCampaigns(accountId: string) {
-        if (!accountId) return [];
+        if (!accountId) return { campaigns: [], abTests: [] };
 
-        // For security, strictly validate UUID format if needed, but Prisma usually handles it.
-        // We only return PUBLISHED campaigns.
-
-        // Note: Ideally we should use the Snapshots logic, but assuming vck.js renders raw campaign for now:
         const campaigns = await this.prisma.campaign.findMany({
             where: {
                 accountId,
@@ -47,6 +43,22 @@ export class PublicService {
             },
         });
 
-        return campaigns;
+        const now = new Date();
+        const abTests = await this.prisma.aBTest.findMany({
+            where: {
+                accountId,
+                status: 'running',
+                startDate: { lte: now },
+                endDate: { gte: now }
+            },
+            select: {
+                id: true,
+                baselineId: true,
+                baselinePercentage: true,
+                variants: true
+            }
+        });
+
+        return { campaigns, abTests };
     }
 }

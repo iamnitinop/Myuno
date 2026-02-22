@@ -3,40 +3,37 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Split, Trash2 } from "lucide-react";
-import { LS } from "@/lib/utils";
-import { AccountData } from "@/lib/types";
-
-const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v3`;
+import { ABTest } from "@/lib/types";
+import { apiFetch } from "@/lib/api";
 
 export default function ABTestsPage() {
     const router = useRouter();
-    const accountId = "ACC_DEMO_001";
-    const [data, setData] = useState<AccountData | null>(null);
+    const [abTests, setAbTests] = useState<ABTest[] | null>(null);
 
     useEffect(() => {
-        const accountData: AccountData = LS.get(KEY_DATA(accountId), {
-            accountId,
-            banners: [],
-            rules: [],
-            abTests: [],
-            events: [],
-        });
-        setData(accountData);
+        const fetchTests = async () => {
+            try {
+                const data = await apiFetch("/ab-tests");
+                setAbTests(data);
+            } catch (err) {
+                console.error("Failed to load AB tests", err);
+                setAbTests([]);
+            }
+        };
+        fetchTests();
     }, []);
 
-    const deleteTest = (testId: string) => {
-        if (!data || !confirm("Are you sure you want to delete this A/B Test?")) return;
-        const newData = {
-            ...data,
-            abTests: (data.abTests || []).filter(t => t.id !== testId)
-        };
-        setData(newData);
-        LS.set(KEY_DATA(accountId), newData);
+    const deleteTest = async (testId: string) => {
+        if (!confirm("Are you sure you want to delete this A/B Test?")) return;
+        try {
+            await apiFetch(`/ab-tests/${testId}`, { method: 'DELETE' });
+            setAbTests(prev => prev ? prev.filter(t => t.id !== testId) : []);
+        } catch (err) {
+            console.error("Failed to delete test", err);
+        }
     };
 
-    if (!data) return <div className="p-8">Loading...</div>;
-
-    const abTests = data.abTests || [];
+    if (abTests === null) return <div className="p-8">Loading...</div>;
 
     return (
         <div className="space-y-6">

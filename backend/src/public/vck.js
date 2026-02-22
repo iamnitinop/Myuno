@@ -21,12 +21,86 @@
         xhr.send();
     }
 
-    function renderCampaigns(campaigns) {
+    function setCookie(cname, cvalue, exdays) {
+        var d = new Date();
+        d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+        var expires = "expires=" + d.toUTCString();
+        document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+    }
+
+    function getCookie(cname) {
+        var name = cname + "=";
+        var ca = document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) == ' ') {
+                c = c.substring(1);
+            }
+            if (c.indexOf(name) == 0) {
+                return c.substring(name.length, c.length);
+            }
+        }
+        return "";
+    }
+
+    function renderCampaigns(data) {
+        var campaigns = data.campaigns || [];
+        var abTests = data.abTests || [];
+
         if (!campaigns || campaigns.length === 0) return;
 
+        // Apply A/B tests
+        abTests.forEach(function (test) {
+            var baselineCampaign = campaigns.find(function (c) { return c.id === test.baselineId; });
+            if (!baselineCampaign) return;
+
+            var cookieName = 'ju_ab_' + test.id;
+            var assignedVariantId = getCookie(cookieName);
+
+            // If not assigned yet, roll the dice
+            if (!assignedVariantId) {
+                var rand = Math.random() * 100;
+                if (rand < test.baselinePercentage) {
+                    assignedVariantId = test.baselineId;
+                } else {
+                    var currentP = test.baselinePercentage;
+                    for (var i = 0; i < test.variants.length; i++) {
+                        var v = test.variants[i];
+                        currentP += v.percentage;
+                        if (rand < currentP) {
+                            if (v.bannerId === 'control') {
+                                assignedVariantId = 'control';
+                            } else {
+                                assignedVariantId = v.bannerId;
+                            }
+                            break;
+                        }
+                    }
+                    if (!assignedVariantId) assignedVariantId = test.baselineId; // fallback
+                }
+                setCookie(cookieName, assignedVariantId, 30);
+            }
+
+            // Apply the assignment map the campaigns list
+            if (assignedVariantId === 'control') {
+                // Remove baseline, they don't see anything
+                campaigns = campaigns.filter(function (c) { return c.id !== test.baselineId; });
+            } else if (assignedVariantId !== test.baselineId) {
+                // Replace baseline with variant
+                var variantCampaign = campaigns.find(function (c) { return c.id === assignedVariantId; });
+                if (variantCampaign) {
+                    var bIdx = campaigns.indexOf(baselineCampaign);
+                    if (bIdx > -1) {
+                        campaigns[bIdx] = variantCampaign; // Swap
+                    }
+                }
+            }
+        });
+
         // Simple renderer for now - picks the first generic popup to show
-        // In a real app, this would handle triggers, rules, etc.
         var campaign = campaigns[0];
+        if (!campaign) return;
+
 
         // Inject styles
         var style = document.createElement("style");

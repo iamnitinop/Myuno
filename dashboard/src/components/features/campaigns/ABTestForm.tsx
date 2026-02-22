@@ -6,6 +6,7 @@ import { ArrowLeft, Monitor, Smartphone } from "lucide-react";
 import { LS } from "@/lib/utils";
 import { AccountData, ABTest } from "@/lib/types";
 import { Input } from "@/components/ui/Input";
+import { apiFetch } from "@/lib/api";
 
 const KEY_DATA = (accountId: string) => `demo_account_${accountId}_data_v3`;
 
@@ -32,14 +33,37 @@ export function ABTestForm({ initialData, onSave }: ABTestFormProps) {
     const [controlGroupPercentage, setControlGroupPercentage] = useState(0);
 
     useEffect(() => {
-        const accountData: AccountData = LS.get(KEY_DATA(accountId), {
-            accountId,
-            banners: [],
-            rules: [],
-            abTests: [],
-            events: [],
-        });
-        setData(accountData);
+        const fetchCampaigns = async () => {
+            try {
+                const res = await apiFetch("/campaigns");
+                const banners = res.map((c: any) => {
+                    const b = typeof c.creativeJson === 'string' ? JSON.parse(c.creativeJson) : c.creativeJson;
+                    b.id = c.id;
+                    b.name = c.name;
+                    b.status = c.status;
+                    b.type = c.type;
+                    return b;
+                });
+                setData({
+                    accountId,
+                    banners,
+                    rules: [],
+                    abTests: [],
+                    events: [],
+                });
+            } catch (err) {
+                console.error("Failed to fetch campaigns for A/B testing", err);
+                setData({
+                    accountId,
+                    banners: [],
+                    rules: [],
+                    abTests: [],
+                    events: [],
+                });
+            }
+        };
+
+        fetchCampaigns();
 
         if (!initialData) {
             // Pre-fill dates for new test
