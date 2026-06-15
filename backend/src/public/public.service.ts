@@ -26,6 +26,15 @@ export class PublicService {
         };
     }
 
+    async previewCampaign(campaignId: string) {
+        const campaign = await this.prisma.campaign.findUnique({
+            where: { id: campaignId },
+            select: { id: true, name: true, type: true, creativeJson: true, rulesJson: true },
+        });
+        if (!campaign) throw new NotFoundException('Campaign not found');
+        return { campaigns: [campaign], abTests: [] };
+    }
+
     async listCampaigns(accountId: string) {
         if (!accountId) return { campaigns: [], abTests: [] };
 

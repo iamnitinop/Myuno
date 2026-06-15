@@ -17,6 +17,13 @@ export class PublicController {
         return res.json(data);
     }
 
+    @Get('preview')
+    async preview(@Query('campaignId') campaignId: string, @Res() res: Response) {
+        const data = await this.svc.previewCampaign(campaignId);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        return res.json(data);
+    }
+
     @Get('public')
     async getCampaigns(@Query('accountId') accountId: string, @Res() res: Response) {
         const data = await this.svc.listCampaigns(accountId);
