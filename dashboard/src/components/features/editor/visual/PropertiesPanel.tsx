@@ -497,6 +497,90 @@ export function PropertiesPanel({
                             />
                         ) : null}
 
+                        {/* CTA configuration for button layers */}
+                        {selectedLayer.type === "button" ? (
+                            <div className="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                                <div className="text-xs font-bold uppercase tracking-wider text-gray-500">Click action</div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Action</label>
+                                    <select
+                                        className="w-full text-sm border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 p-2"
+                                        value={selectedLayer.metadata?.action || "open_url"}
+                                        onChange={(e) => onChange(selectedLayer.id, { metadata: { ...selectedLayer.metadata, action: e.target.value } })}
+                                    >
+                                        <option value="open_url">Open URL</option>
+                                        <option value="add_to_cart">Add to cart (Shopify)</option>
+                                    </select>
+                                </div>
+
+                                {(selectedLayer.metadata?.action || "open_url") === "open_url" ? (
+                                    <>
+                                        <DebouncedInput
+                                            label="CTA URL"
+                                            value={selectedLayer.metadata?.ctaUrl || ""}
+                                            placeholder="https://… or /collections/sale"
+                                            onChange={(e) => onChange(selectedLayer.id, { metadata: { ...selectedLayer.metadata, ctaUrl: e.target.value } })}
+                                        />
+                                        <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedLayer.metadata?.ctaNewTab !== false}
+                                                onChange={(e) => onChange(selectedLayer.id, { metadata: { ...selectedLayer.metadata, ctaNewTab: e.target.checked } })}
+                                            />
+                                            Open in new tab
+                                        </label>
+                                    </>
+                                ) : (
+                                    <>
+                                        <DebouncedInput
+                                            label="Variant ID(s)"
+                                            value={selectedLayer.metadata?.variantId || ""}
+                                            placeholder="e.g. 43812345678901 (comma-separate for multiple)"
+                                            onChange={(e) => onChange(selectedLayer.id, { metadata: { ...selectedLayer.metadata, variantId: e.target.value } })}
+                                        />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <DebouncedInput
+                                                label="Quantity"
+                                                type="number"
+                                                value={selectedLayer.metadata?.quantity || 1}
+                                                onChange={(e) => onChange(selectedLayer.id, { metadata: { ...selectedLayer.metadata, quantity: Number(e.target.value) || 1 } })}
+                                            />
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">After add</label>
+                                                <select
+                                                    className="w-full text-sm border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 p-2"
+                                                    value={selectedLayer.metadata?.afterAction || "cart"}
+                                                    onChange={(e) => onChange(selectedLayer.id, { metadata: { ...selectedLayer.metadata, afterAction: e.target.value } })}
+                                                >
+                                                    <option value="checkout">Go to checkout</option>
+                                                    <option value="cart">Go to cart</option>
+                                                    <option value="stay">Stay on page</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        ) : null}
+
+                        {/* Coupon box: the Shopify discount code to display + apply */}
+                        {selectedLayer.type === "coupon_box" ? (
+                            <div className="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                                <DebouncedInput
+                                    label="Displayed code"
+                                    value={selectedLayer.content}
+                                    onChange={(e) => onChange(selectedLayer.id, { content: e.target.value })}
+                                />
+                                <DebouncedInput
+                                    label="Shopify discount code to apply"
+                                    value={selectedLayer.metadata?.couponCode || ""}
+                                    placeholder="Defaults to the displayed code"
+                                    onChange={(e) => onChange(selectedLayer.id, { metadata: { ...selectedLayer.metadata, couponCode: e.target.value } })}
+                                />
+                                <p className="text-[11px] text-gray-500">Applied to the cart automatically when the banner shows (must be a real discount code created in Shopify).</p>
+                            </div>
+                        ) : null}
+
                         {selectedLayer.type === "image" ? (
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Image URL</label>

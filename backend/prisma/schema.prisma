@@ -18,6 +18,7 @@ model Account {
   campaigns Campaign[]
   events    EventRaw[]
   abTests   ABTest[]
+  globalBanners GlobalBanner[]
 }
 
 model User {
@@ -107,6 +108,27 @@ model EmailCapture {
   @@index([campaignId])
   @@index([email])
   @@index([createdAt])
+}
+
+model GlobalBanner {
+  id           String   @id @default(uuid())
+  accountId    String
+  name         String   @default("Banner")
+  enabled        Boolean  @default(false)
+  sheetUrl       String   @default("")
+  creativeJson   Json
+  offerLayerId   String?
+  offerImageLayerId String?
+  styleJson      Json?
+  rulesJson      Json?
+  layoutJson     Json?
+  priority       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  account      Account  @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
 }
 
 model ABTest {

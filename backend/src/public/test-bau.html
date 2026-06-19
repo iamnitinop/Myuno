@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAU Banner Test (no UTM)</title>
+<script>
+  // --- Clean session so "First URL of this session" = THIS page (no utm) ---
+  try { sessionStorage.clear(); } catch (e) {}
+  try {
+    Object.keys(localStorage).forEach(function (k) {
+      if (k.indexOf("banner_") === 0 || k.indexOf("ju_dismissed_") === 0 || k === "demo_first_url_alltime" || k === "first_visit_ts") localStorage.removeItem(k);
+    });
+  } catch (e) {}
+
+  // --- Justuno embed config ---
+  var qp = new URLSearchParams(location.search);
+  window.ju_num = qp.get("account") || "b176f1f4-c090-417c-a745-974ced683901";
+  window.ju_handle = qp.get("handle") || (location.pathname.split("/").filter(Boolean).pop() || "test-bau.html");
+  window.asset_host = "//" + location.host + "/";
+</script>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; margin: 0; background: #f4f6fb; color: #222; }
+  .info { max-width: 760px; margin: 40px auto; background: #fff; border-radius: 14px; padding: 28px 32px; box-shadow: 0 4px 20px rgba(0,0,0,.06); }
+  h1 { margin: 0 0 6px; font-size: 1.5rem; }
+  .tag { display:inline-block; background:#dbeafe; color:#1d4ed8; font-weight:700; padding:3px 10px; border-radius:999px; font-size:12px; }
+  code { background:#eef; padding:2px 6px; border-radius:5px; }
+  .row { margin: 10px 0; font-size: 14px; }
+  .muted { color:#667; font-size: 13px; }
+  #ju-result { margin-top:16px; padding:14px 16px; border-radius:10px; background:#f1f5f9; font-family:monospace; font-size:13px; white-space:pre-wrap; }
+  .ok { color:#15803d; font-weight:700; }
+  .warn { color:#b45309; font-weight:700; }
+  .filler { height: 1200px; background: linear-gradient(#fff, #eef); margin-top:20px; }
+</style>
+</head>
+<body>
+  <div class="info">
+    <span class="tag">BAU TEST</span>
+    <h1>Business-as-usual page (no UTM)</h1>
+    <p class="muted">This page starts a fresh session whose <b>First URL</b> contains <b>no</b> <code>utm</code>. So the banner whose rule is
+      <code>First URL … does not contain "utm"</code> (your BAU banner) should appear.</p>
+    <div class="row">Account: <code id="d-acc"></code></div>
+    <div class="row">Handle: <code id="d-handle"></code></div>
+    <div class="row">First-session URL the engine sees: <code id="d-first"></code></div>
+    <div id="ju-result">Waiting for banner…</div>
+  </div>
+  <div class="filler"></div>
+
+  <script src="/vck.js"></script>
+  <script>
+    document.getElementById("d-acc").textContent = window.ju_num;
+    document.getElementById("d-handle").textContent = window.ju_handle;
+    document.getElementById("d-first").textContent = sessionStorage.getItem("demo_first_url_session") || location.href;
+
+    function report() {
+      var w = document.getElementById("ju-wrapper");
+      var box = document.getElementById("ju-result");
+      if (w && w.getAttribute("data-ju-banner")) {
+        box.innerHTML = '<span class="ok">✓ Banner shown: "' + w.getAttribute("data-ju-banner") + '"</span>\n(id ' + w.getAttribute("data-ju-id") + ')';
+      } else if (w) {
+        box.innerHTML = '<span class="ok">✓ A banner rendered</span> (no name attribute)';
+      } else {
+        box.innerHTML = '<span class="warn">No banner shown.</span> Either no banner\'s rules matched, or no sheet row is active for this handle. Check candidates below.';
+      }
+      // Also list candidates from the runtime endpoint
+      fetch(window.asset_host.replace(/\/$/, "") + "/global-banner/runtime?accountId=" + encodeURIComponent(window.ju_num) + "&handle=" + encodeURIComponent(window.ju_handle))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var names = (d.banners || []).map(function (b) { return b.name + " [priority " + b.priority + "]"; });
+          box.innerHTML += "\n\nCandidates for this handle: " + (names.length ? names.join(", ") : "none");
+        }).catch(function () {});
+    }
+    setTimeout(report, 1600);
+  </script>
+</body>
+</html>

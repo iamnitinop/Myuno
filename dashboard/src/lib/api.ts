@@ -76,3 +76,47 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     }
     return data;
 }
+
+// --- Global Banners (multiple per account) -------------------------------
+
+export interface GlobalBannerUpsert {
+    name?: string;
+    enabled?: boolean;
+    sheetUrl?: string;
+    creativeJson?: any;
+    offerLayerId?: string | null;
+    offerImageLayerId?: string | null;
+    styleJson?: any;
+    rulesJson?: any;
+    layoutJson?: any;
+    priority?: number;
+}
+
+export async function listGlobalBanners() {
+    return apiFetch("/global-banner");
+}
+
+export async function getGlobalBanner(id: string) {
+    return apiFetch(`/global-banner/${id}`);
+}
+
+export async function createGlobalBanner(cfg: GlobalBannerUpsert) {
+    return apiFetch("/global-banner", { method: "POST", body: JSON.stringify(cfg) });
+}
+
+export async function updateGlobalBanner(id: string, cfg: GlobalBannerUpsert) {
+    return apiFetch(`/global-banner/${id}`, { method: "PUT", body: JSON.stringify(cfg) });
+}
+
+export async function deleteGlobalBanner(id: string) {
+    return apiFetch(`/global-banner/${id}`, { method: "DELETE" });
+}
+
+export async function refreshGlobalBannerSheet(id: string) {
+    return apiFetch(`/global-banner/${id}/refresh`, { method: "POST" });
+}
+
+export async function previewGlobalBanner(id: string, handle: string, sheetUrl?: string) {
+    const sheetParam = sheetUrl ? `&sheetUrl=${encodeURIComponent(sheetUrl)}` : "";
+    return apiFetch(`/global-banner/${id}/preview?handle=${encodeURIComponent(handle)}${sheetParam}`);
+}

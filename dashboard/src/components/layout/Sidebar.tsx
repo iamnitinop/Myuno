@@ -11,7 +11,8 @@ import {
     Settings,
     Split,
     LogOut,
-    User
+    User,
+    Globe
 } from "lucide-react";
 import clsx from "clsx";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -20,6 +21,7 @@ import { LS } from "@/lib/utils";
 const navItems = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Campaigns", href: "/campaigns", icon: Megaphone },
+    { name: "Global Banner", href: "/global-banner", icon: Globe },
     { name: "Templates", href: "/templates", icon: Palette },
     { name: "A/B Tests", href: "/ab-tests", icon: Split },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
