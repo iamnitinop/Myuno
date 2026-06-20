@@ -1,5 +1,5 @@
--- CreateTable
-CREATE TABLE "GlobalBanner" (
+-- CreateTable (idempotent: prod may already have these tables from a pre-migration db push)
+CREATE TABLE IF NOT EXISTS "GlobalBanner" (
     "id" TEXT NOT NULL,
     "accountId" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT false,
@@ -13,7 +13,7 @@ CREATE TABLE "GlobalBanner" (
 );
 
 -- CreateTable
-CREATE TABLE "ABTest" (
+CREATE TABLE IF NOT EXISTS "ABTest" (
     "id" TEXT NOT NULL,
     "accountId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -31,10 +31,18 @@ CREATE TABLE "ABTest" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "GlobalBanner_accountId_key" ON "GlobalBanner"("accountId");
+CREATE UNIQUE INDEX IF NOT EXISTS "GlobalBanner_accountId_key" ON "GlobalBanner"("accountId");
+
+-- AddForeignKey (guarded so re-running against an existing DB is a no-op)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'GlobalBanner_accountId_fkey') THEN
+    ALTER TABLE "GlobalBanner" ADD CONSTRAINT "GlobalBanner_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "GlobalBanner" ADD CONSTRAINT "GlobalBanner_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ABTest" ADD CONSTRAINT "ABTest_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ABTest_accountId_fkey') THEN
+    ALTER TABLE "ABTest" ADD CONSTRAINT "ABTest_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;

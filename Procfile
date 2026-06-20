@@ -1,1 +1,1 @@
-web: cd backend && npm install --include=dev && npx prisma generate && npm run build && npx prisma migrate deploy && npm run start:prod
+web: cd backend && npm install --include=dev && npx prisma generate && npm run build && (npx prisma migrate resolve --rolled-back 20260618063627_add_global_banner || true) && npx prisma migrate deploy && npm run start:prod
