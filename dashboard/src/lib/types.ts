@@ -73,6 +73,128 @@ export interface Banner {
     };
 }
 
+export interface GlobalBannerConfig {
+    id: string;
+    name: string;
+    enabled: boolean;
+    sheetUrl: string;
+    creativeJson: Banner;
+    offerLayerId?: string | null;
+    offerImageLayerId?: string | null;
+    styleJson?: { headingColor?: string; bodyColor?: string } | null;
+    rulesJson?: any;
+    layoutJson?: GlobalBannerLayout | null;
+    priority?: number;
+}
+
+// ---- Flex layout builder (responsive, per-breakpoint) ------------------
+export type GBDevice = "desktop" | "tablet" | "mobile";
+export type GBElementType =
+    | "text" | "sheetMessage" | "sheetImage" | "image"
+    | "button" | "coupon" | "timer" | "close"
+    | "group" // a nested flex group: holds child elements as columns (row) or rows (column)
+    | "html" // custom HTML/CSS/JS, rendered in a sandboxed iframe (isolated)
+    | "cartGoal"; // cart-value threshold messaging (reads Shopify /cart.js live)
+
+// A value with per-breakpoint overrides; mobile inherits tablet inherits desktop.
+export interface GBResponsive<T> { desktop: T; tablet?: Partial<T>; mobile?: Partial<T>; }
+
+// Independent per-side padding & margin (T/R/B/L). Falls back to legacy paddingX/paddingY.
+export interface GBSpacing {
+    padTop?: number; padRight?: number; padBottom?: number; padLeft?: number;
+    marginTop?: number; marginRight?: number; marginBottom?: number; marginLeft?: number;
+    hidden?: boolean; // per-breakpoint visibility (own-bucket, NOT inherited): hide on this device
+}
+
+export interface GBElStyle extends GBSpacing {
+    color?: string; headingColor?: string; bodyColor?: string;
+    fontSize?: number; fontWeight?: number | string; fontStyle?: string;
+    textAlign?: string; lineHeight?: number | string; fontFamily?: string;
+    paddingX?: number; boxColor?: string; heightPx?: number; // heightPx = element min-height
+    grow?: number; alignSelf?: string; widthPct?: number; // widthPct = element track width as % of its container
+    // group ("columns") layout — how a group arranges its children
+    direction?: "row" | "column"; justify?: string; align?: string; gap?: number; wrap?: boolean;
+    // image / sheetImage box metrics
+    width?: number; height?: number; radius?: number; fit?: string;
+    // sheetMessage 2nd line (disclaimer)
+    line2Color?: string; line2FontSize?: number; line2FontWeight?: number | string; line2FontStyle?: string;
+}
+
+// Rich background model shared by the canvas (bar) and containers.
+// bgType "solid" => use `background` color; "gradient" => gradient* fields;
+// "image" => bgImageUrl (+ optional overlay for readability).
+export interface GBBackground {
+    bgType?: "solid" | "gradient" | "image";
+    background?: string;                       // solid color (also legacy fallback)
+    gradientType?: "linear" | "radial";
+    gradientAngle?: number;                    // deg, for linear
+    gradientFrom?: string; gradientVia?: string; gradientTo?: string;
+    bgImageUrl?: string;
+    bgImageSize?: string;                      // cover | contain | auto
+    bgImagePosition?: string;                  // center | top | bottom | left | right
+    bgImageRepeat?: string;                    // no-repeat | repeat
+    bgOverlay?: string;                        // rgba(...) overlay laid over the image
+}
+
+export interface GBContStyle extends GBBackground, GBSpacing {
+    direction?: "row" | "column"; justify?: string; align?: string; gap?: number; wrap?: boolean;
+    paddingX?: number; paddingY?: number; grow?: number; widthPct?: number; radius?: number; minHeight?: number;
+}
+
+export interface GBBarStyle extends GBBackground, GBSpacing {
+    paddingX?: number; paddingY?: number; gap?: number;
+    minHeight?: number; maxWidth?: number; direction?: "row" | "column"; align?: string;
+}
+
+export interface GBTimer {
+    mode: "days" | "hours";       // days+h+m+s  OR  hours-only(+m+s)
+    endInstant: string;            // absolute UTC ISO — the countdown target
+    inputWall?: string;            // datetime-local string the user typed (assumed IST)
+    timezone?: string;             // IANA tz for the displayed label (default Asia/Kolkata)
+    showLabels?: boolean;
+    onExpire?: "hide" | "stop";
+}
+
+// Cart-value threshold messaging. Placeholders in messages: {remaining} {total} {threshold}.
+export interface GBCartGoal {
+    threshold: number;            // unlock amount in major units (e.g. 60 = £60)
+    currencySymbol?: string;      // prefix for amounts (default "£")
+    msgEmpty?: string;            // cart total = 0
+    msgProgress?: string;         // 0 < total < threshold (use {remaining})
+    msgUnlocked?: string;         // total >= threshold
+    previewTotal?: number;        // editor-only: sample cart total to preview a state
+}
+
+export interface GBElement {
+    id: string;
+    type: GBElementType;
+    // global (device-independent) content
+    content?: string; sampleHtml?: string; sampleUrl?: string;
+    variantId?: string; ctaUrl?: string; ctaNewTab?: boolean; quantity?: number; afterAction?: string;
+    couponCode?: string;
+    timer?: GBTimer;
+    children?: GBElement[]; // for type "group": nested elements laid out as columns/rows
+    html?: string; css?: string; js?: string; // for type "html": custom code (sandboxed iframe)
+    cartGoal?: GBCartGoal; // for type "cartGoal": cart-value threshold messaging
+    // per-breakpoint style + box metrics
+    responsive: GBResponsive<GBElStyle>;
+}
+
+export interface GBFlexContainer {
+    id: string;
+    elements: GBElement[];
+    responsive: GBResponsive<GBContStyle>;
+}
+
+export interface GlobalBannerLayout {
+    bar: {
+        mobileStack?: boolean;     // stack containers vertically on mobile
+        couponCode?: string;       // optional Shopify discount applied on show
+        responsive: GBResponsive<GBBarStyle>;
+    };
+    containers: GBFlexContainer[];
+}
+
 export interface RuleCondition {
     type: string;
     op: string;

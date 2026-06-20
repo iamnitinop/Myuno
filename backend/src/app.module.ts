@@ -14,6 +14,7 @@ import { PublishModule } from './publish/publish.module';
 import { EmailCaptureModule } from './email-capture/email-capture.module';
 
 import { AbTestsModule } from './ab-tests/ab-tests.module';
+import { GlobalBannerModule } from './global-banner/global-banner.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AbTestsModule } from './ab-tests/ab-tests.module';
     PublishModule,
     EmailCaptureModule,
     AbTestsModule,
+    GlobalBannerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
