@@ -67,7 +67,10 @@ export function cartGoalMessage(cfg: any, totalMajor: number): string {
     if (thr > 0 && totalMajor >= thr) t = cfg.msgUnlocked || "";
     else if (totalMajor <= 0) t = cfg.msgEmpty || cfg.msgProgress || "";
     else t = cfg.msgProgress || "";
-    return String(t).replace(/\{remaining\}/g, fmt(remaining)).replace(/\{total\}/g, fmt(totalMajor)).replace(/\{threshold\}/g, fmt(thr));
+    // Wrap each substituted amount in a span so it can be styled independently
+    // (highlight color/weight). Inherits surrounding styles when no highlight is set.
+    const amt = (nv: number) => `<span class="jugb-cg-amt">${fmt(nv)}</span>`;
+    return String(t).replace(/\{remaining\}/g, amt(remaining)).replace(/\{total\}/g, amt(totalMajor)).replace(/\{threshold\}/g, amt(thr));
 }
 
 // Per-side margin string (no legacy fallback).
@@ -179,7 +182,11 @@ function emitElement(e: any, css: string[], device: GBDevice, scope: string) {
     if (s.fontStyle) r2 += `font-style:${s.fontStyle};`;
     if (s.lineHeight) r2 += `line-height:${s.lineHeight};`;
     if (s.fontFamily) r2 += `font-family:${s.fontFamily};`;
-    if (isGroup && (s.bgType || s.background)) r2 += `background:${composeBackground(s)};`;
+    // Per-element background box (any element type), independent of the banner/container bg.
+    if (e.type !== "close" && (s.bgType || s.background)) r2 += `background:${composeBackground(s)};`;
+    if (e.type !== "close" && s.boxRadius) r2 += `border-radius:${s.boxRadius}px;${s.bgType === "image" ? "overflow:hidden;" : ""}`;
+    // Cart Goal: keep the message on a single line by default; wrap only when the user opts in.
+    if (e.type === "cartGoal" && !(e.cartGoal && e.cartGoal.wrap)) r2 += "white-space:nowrap;";
     r2 += padDecl(s);
     r2 += marginDecl(s);
     if (s.heightPx && !isHtml) r2 += `min-height:${s.heightPx}px;`; // html: height goes on the iframe
@@ -200,6 +207,13 @@ function emitElement(e: any, css: string[], device: GBDevice, scope: string) {
     }
     if (e.type === "image" || e.type === "sheetImage") {
         css.push(`${sel} img{width:${s.width || 64}px;height:${s.height || 64}px;object-fit:${s.fit || "cover"};border-radius:${s.radius || 0}%;display:block;}`);
+    }
+    if (e.type === "cartGoal") {
+        // Highlight styling for the substituted amounts ({remaining}/{total}/{threshold}).
+        let hl = "";
+        if (s.cgHighlightColor) hl += `color:${s.cgHighlightColor};`;
+        if (s.cgHighlightWeight) hl += `font-weight:${s.cgHighlightWeight};`;
+        if (hl) css.push(`${sel} .jugb-cg-amt{${hl}}`);
     }
     if (e.type === "timer") {
         css.push(`${sel} .jugb-trow{display:inline-flex;gap:5px;align-items:center;}`);

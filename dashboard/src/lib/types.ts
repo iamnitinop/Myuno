@@ -106,11 +106,15 @@ export interface GBSpacing {
     hidden?: boolean; // per-breakpoint visibility (own-bucket, NOT inherited): hide on this device
 }
 
-export interface GBElStyle extends GBSpacing {
+// Note: extends GBBackground so any element can carry its own background box
+// (solid / gradient / image) plus boxRadius — independent of the banner/container bg.
+export interface GBElStyle extends GBBackground, GBSpacing {
     color?: string; headingColor?: string; bodyColor?: string;
     fontSize?: number; fontWeight?: number | string; fontStyle?: string;
     textAlign?: string; lineHeight?: number | string; fontFamily?: string;
     paddingX?: number; boxColor?: string; heightPx?: number; // heightPx = element min-height
+    boxRadius?: number; // per-element background-box corner radius (px)
+    cgHighlightColor?: string; cgHighlightWeight?: number | string; // cartGoal: style for substituted amounts ({remaining}/{total}/{threshold})
     grow?: number; alignSelf?: string; widthPct?: number; // widthPct = element track width as % of its container
     // group ("columns") layout — how a group arranges its children
     direction?: "row" | "column"; justify?: string; align?: string; gap?: number; wrap?: boolean;
@@ -163,6 +167,7 @@ export interface GBCartGoal {
     msgProgress?: string;         // 0 < total < threshold (use {remaining})
     msgUnlocked?: string;         // total >= threshold
     previewTotal?: number;        // editor-only: sample cart total to preview a state
+    wrap?: boolean;               // allow the message to wrap to multiple lines (default: single line / nowrap)
 }
 
 export interface GBElement {

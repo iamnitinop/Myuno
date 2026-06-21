@@ -40,7 +40,9 @@ const BG_POS = [{ value: "center", label: "Center" }, { value: "top", label: "To
 const BG_REPEAT = [{ value: "no-repeat", label: "No repeat" }, { value: "repeat", label: "Tile" }];
 
 // Reusable background designer for the canvas (bar) and containers: solid / gradient / image-URL.
-function BackgroundControls({ r, set }: { r: any; set: (p: any) => void }) {
+// When `perDevice` is provided, the Image section exposes one URL per breakpoint (Desktop /
+// Tablet / Mobile) — tablet/mobile fall back to the larger breakpoint's image when left blank.
+function BackgroundControls({ r, set, perDevice }: { r: any; set: (p: any) => void; perDevice?: { resp: any; setDev: (dev: GBDevice, patch: any) => void } }) {
     const type = r.bgType || "solid";
     return (
         <div className="space-y-2 rounded-md border border-gray-200 dark:border-gray-700 p-2.5">
@@ -58,7 +60,19 @@ function BackgroundControls({ r, set }: { r: any; set: (p: any) => void }) {
                 </div>
             </>)}
             {type === "image" && (<>
-                <Field label="Image URL"><TextIn value={r.bgImageUrl || ""} placeholder="https://…/bg.jpg" onChange={(e: any) => set({ bgImageUrl: e.target.value })} /></Field>
+                {perDevice ? (
+                    <div className="space-y-1.5 rounded-md bg-gray-50 dark:bg-gray-900/40 p-2">
+                        <div className="text-[10px] text-gray-500 leading-snug">Separate image per screen. Leave Tablet/Mobile blank to reuse the larger screen's image.</div>
+                        {DEVICES.map((d) => (
+                            <Field key={d} label={d[0].toUpperCase() + d.slice(1) + " image URL"}>
+                                <TextIn value={perDevice.resp?.[d]?.bgImageUrl || ""} placeholder={d === "desktop" ? "https://…/desktop.jpg" : "blank = inherit larger screen"}
+                                    onChange={(e: any) => perDevice.setDev(d, e.target.value ? { bgImageUrl: e.target.value, bgType: "image" } : { bgImageUrl: undefined })} />
+                            </Field>
+                        ))}
+                    </div>
+                ) : (
+                    <Field label="Image URL"><TextIn value={r.bgImageUrl || ""} placeholder="https://…/bg.jpg" onChange={(e: any) => set({ bgImageUrl: e.target.value })} /></Field>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                     <Field label="Size"><SelIn value={r.bgImageSize || "cover"} onChange={(v) => set({ bgImageSize: v })} options={BG_SIZE} /></Field>
                     <Field label="Position"><SelIn value={r.bgImagePosition || "center"} onChange={(v) => set({ bgImagePosition: v })} options={BG_POS} /></Field>
@@ -295,6 +309,13 @@ export function GlobalBannerLayoutEditor({ layout, onChange, id, sheetUrl }: { l
     const updateElement = (eid: string, patch: any) => setContainers(containers.map((c) => ({ ...c, elements: elPatch(c.elements, eid, patch) })));
     const setElStyle = (eid: string, patch: any) => setContainers(containers.map((c) => ({ ...c, elements: elPatchResp(c.elements, eid, (resp) => patchResp(resp, patch)) })));
 
+    // Same as above but targeting an ARBITRARY device's bucket (for per-device background images).
+    const patchRespDev = (resp: any, dev: GBDevice, patch: any): any =>
+        dev === "desktop" ? { ...resp, desktop: { ...resp.desktop, ...patch } } : { ...resp, [dev]: { ...(resp[dev] || {}), ...patch } };
+    const setBarStyleDev = (dev: GBDevice, patch: any) => onChange({ ...layout, bar: { ...bar, responsive: patchRespDev(bar.responsive, dev, patch) } });
+    const setContStyleDev = (cid: string, dev: GBDevice, patch: any) => setContainers(containers.map((c) => (c.id === cid ? { ...c, responsive: patchRespDev(c.responsive, dev, patch) } : c)));
+    const setElStyleDev = (eid: string, dev: GBDevice, patch: any) => setContainers(containers.map((c) => ({ ...c, elements: elPatchResp(c.elements, eid, (resp) => patchRespDev(resp, dev, patch)) })));
+
     const addContainer = () => { const c = newContainer(); setContainers([...containers, c]); setSel({ kind: "container", id: c.id }); };
     const removeContainer = (cid: string) => { setContainers(containers.filter((c) => c.id !== cid)); setSel({ kind: "bar", id: "bar" }); };
     const removeElement = (eid: string) => setContainers(containers.map((c) => ({ ...c, elements: elRemove(c.elements, eid) })));
@@ -418,7 +439,7 @@ export function GlobalBannerLayoutEditor({ layout, onChange, id, sheetUrl }: { l
                     {sel.kind === "bar" && (
                         <>
                             <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Canvas (the bar that holds all containers)</div>
-                            <BackgroundControls r={barR} set={setBarStyle} />
+                            <BackgroundControls r={barR} set={setBarStyle} perDevice={{ resp: bar.responsive, setDev: setBarStyleDev }} />
                             <Field label="Gap"><NumIn value={barR.gap} onChange={(v: number) => setBarStyle({ gap: v })} /></Field>
                             <HeightControl value={barR.minHeight} onChange={(v) => setBarStyle({ minHeight: v })} autoLabel="Auto height (canvas fits content)" />
                             <Field label="Content max width (px, 0=full)"><NumIn value={barR.maxWidth} onChange={(v: number) => setBarStyle({ maxWidth: v })} /></Field>
@@ -451,13 +472,14 @@ export function GlobalBannerLayoutEditor({ layout, onChange, id, sheetUrl }: { l
                             <div className="flex items-center"><Toggle label="Wrap items" checked={!!cr.wrap} onChange={(v) => setContStyle(selCont.id, { wrap: v })} /></div>
                             <SpacingControls r={cr} set={(p) => setContStyle(selCont.id, p)} margin />
                             <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 pt-1">Background</div>
-                            <BackgroundControls r={cr} set={(p) => setContStyle(selCont.id, p)} />
+                            <BackgroundControls r={cr} set={(p) => setContStyle(selCont.id, p)} perDevice={{ resp: selCont.responsive, setDev: (d, p) => setContStyleDev(selCont.id, d, p) }} />
                         </>
                     ); })()}
 
                     {selEl && (<>
                         <Toggle label={`Visible on ${device}`} checked={!(selEl.responsive?.[device]?.hidden)} onChange={(v) => setElStyle(selEl.id, { hidden: !v })} />
-                        <ElementProps el={selEl} r={resolve(selEl.responsive, device)} setStyle={(p: any) => setElStyle(selEl.id, p)} setEl={(p: any) => updateElement(selEl.id, p)} />
+                        <ElementProps el={selEl} r={resolve(selEl.responsive, device)} setStyle={(p: any) => setElStyle(selEl.id, p)} setEl={(p: any) => updateElement(selEl.id, p)}
+                            perDevice={{ resp: selEl.responsive, setDev: (d: GBDevice, p: any) => setElStyleDev(selEl.id, d, p) }} />
                     </>)}
                 </div>
             </div>
@@ -467,7 +489,7 @@ export function GlobalBannerLayoutEditor({ layout, onChange, id, sheetUrl }: { l
     );
 }
 
-function ElementProps({ el, r, setStyle, setEl }: { el: GBElement; r: any; setStyle: (p: any) => void; setEl: (p: any) => void }) {
+function ElementProps({ el, r, setStyle, setEl, perDevice }: { el: GBElement; r: any; setStyle: (p: any) => void; setEl: (p: any) => void; perDevice?: { resp: any; setDev: (dev: GBDevice, patch: any) => void } }) {
     const typography = (
         <>
             <Field label="Color"><ColorIn value={r.color} onChange={(v) => setStyle({ color: v })} /></Field>
@@ -551,11 +573,12 @@ function ElementProps({ el, r, setStyle, setEl }: { el: GBElement; r: any; setSt
                     <div className="flex items-end pb-1"><Toggle label="Wrap" checked={!!r.wrap} onChange={(v) => setStyle({ wrap: v })} /></div>
                 </div>
                 <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 pt-1">Background</div>
-                <BackgroundControls r={r} set={setStyle} />
+                <BackgroundControls r={r} set={setStyle} perDevice={perDevice} />
+                <Field label="Corner radius (px)"><NumIn value={r.boxRadius} onChange={(v: number) => setStyle({ boxRadius: v })} /></Field>
                 <div className="text-[10px] text-gray-400">Drag elements into this group from the left panel to make columns.</div>
             </>)}
 
-            {el.type === "cartGoal" && <CartGoalProps el={el} setEl={setEl} />}
+            {el.type === "cartGoal" && <CartGoalProps el={el} r={r} setStyle={setStyle} setEl={setEl} />}
 
             {el.type === "html" && (<>
                 <div className="text-[11px] text-gray-500 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-2 leading-relaxed">Runs in an isolated sandbox (its CSS/JS can't affect the rest of the banner or page). Set the box height under <b>Spacing &amp; size</b> below.</div>
@@ -565,6 +588,14 @@ function ElementProps({ el, r, setStyle, setEl }: { el: GBElement; r: any; setSt
             </>)}
 
             {el.type === "close" && (<><Field label="Color"><ColorIn value={r.color} onChange={(v) => setStyle({ color: v })} /></Field><Field label="Font size"><NumIn value={r.fontSize} onChange={(v: number) => setStyle({ fontSize: v })} /></Field></>)}
+
+            {el.type !== "close" && el.type !== "group" && el.type !== "image" && el.type !== "sheetImage" && (
+                <div className="pt-2 mt-1 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Element background (this breakpoint)</div>
+                    <BackgroundControls r={r} set={setStyle} perDevice={perDevice} />
+                    <Field label="Corner radius (px)"><NumIn value={r.boxRadius} onChange={(v: number) => setStyle({ boxRadius: v })} /></Field>
+                </div>
+            )}
 
             {el.type !== "close" && (
                 <div className="pt-2 mt-1 border-t border-gray-200 dark:border-gray-700 space-y-2">
@@ -606,13 +637,13 @@ function TimerProps({ el, r, setStyle, setEl }: { el: GBElement; r: any; setStyl
     );
 }
 
-function CartGoalProps({ el, setEl }: { el: GBElement; setEl: (p: any) => void }) {
+function CartGoalProps({ el, r, setStyle, setEl }: { el: GBElement; r: any; setStyle: (p: any) => void; setEl: (p: any) => void }) {
     const cg = (el.cartGoal || {}) as any;
     const setCG = (patch: any) => setEl({ cartGoal: { ...cg, ...patch } });
     return (
         <>
             <div className="text-[11px] text-gray-500 rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-2 leading-relaxed">
-                Reads the live Shopify cart total and switches between the 3 messages automatically. Placeholders: <code>{"{remaining}"}</code>, <code>{"{total}"}</code>, <code>{"{threshold}"}</code>. HTML allowed (e.g. <code>&lt;strong&gt;</code>).
+                Reads the live Shopify cart total and switches between the 3 messages automatically. Placeholders: <code>{"{remaining}"}</code>, <code>{"{total}"}</code>, <code>{"{threshold}"}</code>. HTML allowed (e.g. <code>&lt;span style=&quot;color:gold&quot;&gt;</code>) to colour any specific words.
             </div>
             <div className="grid grid-cols-2 gap-2">
                 <Field label="Unlock threshold"><NumIn value={cg.threshold} onChange={(v: number) => setCG({ threshold: v })} /></Field>
@@ -622,6 +653,20 @@ function CartGoalProps({ el, setEl }: { el: GBElement; setEl: (p: any) => void }
             <Field label="② In progress (below threshold)"><textarea className={inputCls + " h-16"} value={cg.msgProgress || ""} onChange={(e) => setCG({ msgProgress: e.target.value })} /></Field>
             <Field label="③ Unlocked (at/above threshold)"><textarea className={inputCls + " h-16"} value={cg.msgUnlocked || ""} onChange={(e) => setCG({ msgUnlocked: e.target.value })} /></Field>
             <Field label="Preview cart total (editor only)"><NumIn value={cg.previewTotal} onChange={(v: number) => setCG({ previewTotal: v })} /></Field>
+
+            <div className="mt-1 pt-2 border-t border-gray-200 dark:border-gray-700 text-[11px] font-bold uppercase tracking-wide text-gray-500">Text style (this breakpoint)</div>
+            <Toggle label="Keep on one line (wrap only if too narrow)" checked={!cg.wrap} onChange={(v) => setCG({ wrap: !v })} />
+            <Field label="Text color (whole message)"><ColorIn value={r.color} onChange={(v) => setStyle({ color: v })} /></Field>
+            <div className="grid grid-cols-2 gap-2">
+                <Field label="Font size"><NumIn value={r.fontSize} onChange={(v: number) => setStyle({ fontSize: v })} /></Field>
+                <Field label="Weight"><NumIn value={r.fontWeight} onChange={(v: number) => setStyle({ fontWeight: v })} /></Field>
+            </div>
+            <Field label="Align"><SelIn value={r.textAlign} onChange={(v) => setStyle({ textAlign: v })} options={ALIGN} /></Field>
+            <div className="mt-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-gray-500">Amount highlight ({"{remaining}"} / {"{total}"} / {"{threshold}"})</div>
+            <div className="grid grid-cols-2 gap-2">
+                <Field label="Color"><ColorIn value={r.cgHighlightColor} onChange={(v) => setStyle({ cgHighlightColor: v })} /></Field>
+                <Field label="Weight"><NumIn value={r.cgHighlightWeight} onChange={(v: number) => setStyle({ cgHighlightWeight: v })} /></Field>
+            </div>
         </>
     );
 }

@@ -670,7 +670,9 @@
         if (thr > 0 && totalMajor >= thr) t = cfg.msgUnlocked || "";
         else if (totalMajor <= 0) t = cfg.msgEmpty || cfg.msgProgress || "";
         else t = cfg.msgProgress || "";
-        return String(t).replace(/\{remaining\}/g, fmt(remaining)).replace(/\{total\}/g, fmt(totalMajor)).replace(/\{threshold\}/g, fmt(thr));
+        // Wrap substituted amounts so they can be styled independently (.jugb-cg-amt).
+        function amt(nv) { return '<span class="jugb-cg-amt">' + fmt(nv) + '</span>'; }
+        return String(t).replace(/\{remaining\}/g, amt(remaining)).replace(/\{total\}/g, amt(totalMajor)).replace(/\{threshold\}/g, amt(thr));
     }
 
     // Sandboxed-iframe document for a custom HTML/CSS/JS element. Mirrors bannerCss.buildHtmlSrcdoc.
@@ -779,7 +781,11 @@
         if (s.fontStyle) er += "font-style:" + s.fontStyle + ";";
         if (s.lineHeight) er += "line-height:" + s.lineHeight + ";";
         if (s.fontFamily) er += "font-family:" + s.fontFamily + ";";
-        if (isGroup && (s.bgType || s.background)) er += "background:" + jugbBg(s) + ";";
+        // Per-element background box (any element type), independent of the banner/container bg.
+        if (e.type !== "close" && (s.bgType || s.background)) er += "background:" + jugbBg(s) + ";";
+        if (e.type !== "close" && s.boxRadius) er += "border-radius:" + s.boxRadius + "px;" + (s.bgType === "image" ? "overflow:hidden;" : "");
+        // Cart Goal: single line by default; wrap only when the user opts in.
+        if (e.type === "cartGoal" && !(e.cartGoal && e.cartGoal.wrap)) er += "white-space:nowrap;";
         er += jugbPad(s);
         er += jugbMargin(s);
         if (s.heightPx && !isHtml) er += "min-height:" + s.heightPx + "px;";
@@ -799,6 +805,12 @@
         }
         if (e.type === "image" || e.type === "sheetImage") {
             css.push(sel + " img{width:" + (s.width || 64) + "px;height:" + (s.height || 64) + "px;object-fit:" + (s.fit || "cover") + ";border-radius:" + (s.radius || 0) + "%;display:block;}");
+        }
+        if (e.type === "cartGoal") {
+            var hl = "";
+            if (s.cgHighlightColor) hl += "color:" + s.cgHighlightColor + ";";
+            if (s.cgHighlightWeight) hl += "font-weight:" + s.cgHighlightWeight + ";";
+            if (hl) css.push(sel + " .jugb-cg-amt{" + hl + "}");
         }
         if (e.type === "timer") {
             css.push(sel + " .jugb-trow{display:inline-flex;gap:5px;align-items:center;}");
@@ -878,6 +890,8 @@
 
         var closed = false, origBodyPad = 0, bannerH = 0;
         var shiftedHeaders = []; // theme sticky/fixed headers we pushed below the banner (to restore on close)
+        var ro = null;           // ResizeObserver that keeps the reserved space in sync with content height
+        var onWinResize = null;  // window resize handler (breakpoint changes can change height)
         var cartGoalEls = []; // {el, cfg} for cart-value threshold messaging (updated from /cart.js)
         function updateCartGoals() {
             if (closed || !cartGoalEls.length) return;
@@ -887,8 +901,21 @@
                     .then(function (cart) {
                         var totalMajor = (Number(cart && cart.total_price) || 0) / 100;
                         for (var i = 0; i < cartGoalEls.length; i++) cartGoalEls[i].el.innerHTML = jugbCartGoalText(cartGoalEls[i].cfg, totalMajor);
+                        syncBannerHeight(); // message length may have changed the banner height
                     }).catch(function () {});
             } catch (e) {}
+        }
+        // Re-measure the banner and keep the reserved page space + theme-header offset in
+        // sync whenever content grows/shrinks (long sheet messages, async images, breakpoint
+        // changes, font swaps). This is what makes the canvas height truly dynamic.
+        function syncBannerHeight() {
+            if (closed) return;
+            var h = bannerEl.offsetHeight || bar.minHeight || 0;
+            if (!h || h === bannerH) return;
+            bannerH = h;
+            setBannerHeightVar(bannerH);
+            for (var i = 0; i < shiftedHeaders.length; i++) { try { shiftedHeaders[i].el.style.top = bannerH + "px"; } catch (e) {} }
+            document.body.style.paddingTop = (origBodyPad + bannerH) + "px";
         }
         // Reusable offset variable for themes that want to consume it in CSS
         // (e.g. header { top: var(--promo-banner-height) }). Set on both names.
@@ -931,6 +958,8 @@
         function doClose() {
             if (closed) return; closed = true;
             for (var i = 0; i < timers.length; i++) clearInterval(timers[i]);
+            if (ro) { try { ro.disconnect(); } catch (e) {} ro = null; }
+            if (onWinResize) { try { window.removeEventListener("resize", onWinResize); } catch (e) {} onWinResize = null; }
             if (meta.id) {
                 STORAGE.session.setItem("banner_closed_" + meta.id, "1");
                 try { window.localStorage.setItem("ju_dismissed_" + meta.id, "1"); } catch (e) {}
@@ -1035,6 +1064,13 @@
         origBodyPad = parseFloat(window.getComputedStyle(document.body).paddingTop || "0") || 0;
         setBannerHeightVar(bannerH);                 // exposes --promo-banner-height / --ju-banner-height
         offsetStickyHeaders(bannerH);                // push sticky/fixed theme headers below the banner
+
+        // Keep the reserved space synced with the live content height (dynamic canvas).
+        try {
+            if (window.ResizeObserver) { ro = new ResizeObserver(function () { syncBannerHeight(); }); ro.observe(bannerEl); }
+        } catch (e) {}
+        onWinResize = function () { syncBannerHeight(); };
+        try { window.addEventListener("resize", onWinResize); } catch (e) {}
 
         if (reduceMotion) {
             bannerEl.style.transform = "translateY(0)";
