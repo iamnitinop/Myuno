@@ -787,8 +787,9 @@
         // Per-element background box (any element type), independent of the banner/container bg.
         if (e.type !== "close" && (s.bgType || s.background)) er += "background:" + jugbBg(s) + ";";
         if (e.type !== "close" && s.boxRadius) er += "border-radius:" + s.boxRadius + "px;" + (s.bgType === "image" ? "overflow:hidden;" : "");
-        // Cart Goal: single line by default; wrap only when the user opts in.
-        if (e.type === "cartGoal" && !(e.cartGoal && e.cartGoal.wrap)) er += "white-space:nowrap;";
+        // Cart Goal: wrap naturally (one line when it fits, wraps + grows when too narrow).
+        // Only force a single line when the user explicitly opts in.
+        if (e.type === "cartGoal" && e.cartGoal && e.cartGoal.noWrap) er += "white-space:nowrap;";
         er += jugbPad(s);
         er += jugbMargin(s);
         if (s.heightPx && !isHtml) er += "min-height:" + s.heightPx + "px;";

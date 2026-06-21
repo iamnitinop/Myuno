@@ -189,8 +189,9 @@ function emitElement(e: any, css: string[], device: GBDevice, scope: string) {
     // Per-element background box (any element type), independent of the banner/container bg.
     if (e.type !== "close" && (s.bgType || s.background)) r2 += `background:${composeBackground(s)};`;
     if (e.type !== "close" && s.boxRadius) r2 += `border-radius:${s.boxRadius}px;${s.bgType === "image" ? "overflow:hidden;" : ""}`;
-    // Cart Goal: keep the message on a single line by default; wrap only when the user opts in.
-    if (e.type === "cartGoal" && !(e.cartGoal && e.cartGoal.wrap)) r2 += "white-space:nowrap;";
+    // Cart Goal: wrap naturally (so it stays one line when it fits and wraps + grows in
+    // height when the screen is too narrow). Only force a single line if the user opts in.
+    if (e.type === "cartGoal" && e.cartGoal && e.cartGoal.noWrap) r2 += "white-space:nowrap;";
     r2 += padDecl(s);
     r2 += marginDecl(s);
     if (s.heightPx && !isHtml) r2 += `min-height:${s.heightPx}px;`; // html: height goes on the iframe

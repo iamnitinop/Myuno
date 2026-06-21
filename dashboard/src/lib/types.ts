@@ -167,7 +167,7 @@ export interface GBCartGoal {
     msgProgress?: string;         // 0 < total < threshold (use {remaining})
     msgUnlocked?: string;         // total >= threshold
     previewTotal?: number;        // editor-only: sample cart total to preview a state
-    wrap?: boolean;               // allow the message to wrap to multiple lines (default: single line / nowrap)
+    noWrap?: boolean;             // force the message onto a single line (clip if too long). Default: wrap when too narrow.
 }
 
 export interface GBElement {

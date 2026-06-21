@@ -655,7 +655,8 @@ function CartGoalProps({ el, r, setStyle, setEl }: { el: GBElement; r: any; setS
             <Field label="Preview cart total (editor only)"><NumIn value={cg.previewTotal} onChange={(v: number) => setCG({ previewTotal: v })} /></Field>
 
             <div className="mt-1 pt-2 border-t border-gray-200 dark:border-gray-700 text-[11px] font-bold uppercase tracking-wide text-gray-500">Text style (this breakpoint)</div>
-            <Toggle label="Keep on one line (wrap only if too narrow)" checked={!cg.wrap} onChange={(v) => setCG({ wrap: !v })} />
+            <Toggle label="Force onto one line (clip instead of wrapping)" checked={!!cg.noWrap} onChange={(v) => setCG({ noWrap: v })} />
+            <div className="text-[10px] text-gray-400 -mt-1">Off (default): stays on one line when it fits, wraps to more lines (and grows the banner) on narrow screens.</div>
             <Field label="Text color (whole message)"><ColorIn value={r.color} onChange={(v) => setStyle({ color: v })} /></Field>
             <div className="grid grid-cols-2 gap-2">
                 <Field label="Font size"><NumIn value={r.fontSize} onChange={(v: number) => setStyle({ fontSize: v })} /></Field>
