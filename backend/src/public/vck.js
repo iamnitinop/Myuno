@@ -868,13 +868,18 @@
         wrapper.setAttribute("aria-label", "Site announcement");
         if (meta.name) wrapper.setAttribute("data-ju-banner", meta.name);
         if (meta.id) wrapper.setAttribute("data-ju-id", meta.id);
-        wrapper.style.position = "fixed";
-        wrapper.style.top = "0"; wrapper.style.left = "0"; wrapper.style.right = "0"; wrapper.style.width = "100%"; wrapper.style.overflow = "hidden";
+        // In-flow at the very top of <body> (NOT fixed): the wrapper occupies real
+        // layout height, so the header + page content sit below it and shift together
+        // exactly once — no fixed-overlay CLS, no body-padding hack, no header/body
+        // misalignment. overflow:hidden lets the bar slide into the reserved space.
+        wrapper.style.position = "relative";
+        wrapper.style.width = "100%";
+        wrapper.style.overflow = "hidden";
 
         var bannerEl = document.createElement("div"); bannerEl.id = "ju-banner";
         var innerEl = document.createElement("div"); innerEl.className = "jugb-inner";
 
-        var closed = false, origBodyPad = 0, bannerH = 0;
+        var closed = false, bannerH = 0;
         var cartGoalEls = []; // {el, cfg} for cart-value threshold messaging (updated from /cart.js)
         function updateCartGoals() {
             if (closed || !cartGoalEls.length) return;
@@ -896,15 +901,21 @@
                 try { window.localStorage.setItem("ju_dismissed_" + meta.id, "1"); } catch (e) {}
             }
             setHeaderOffset(0);
-            var bs = document.body.style;
-            if (reduceMotion) { bs.paddingTop = origBodyPad + "px"; wrapper.remove(); styleEl.remove(); return; }
-            bs.transition = "padding-top " + DURATION + "ms " + EASE;
-            bs.paddingTop = origBodyPad + "px";
-            bannerEl.style.transform = "translateY(-100%)";
             var done = false;
             function cleanup() { if (done) return; done = true; wrapper.remove(); styleEl.remove(); }
-            bannerEl.addEventListener("transitionend", function (e) { if (e.propertyName === "transform") cleanup(); });
-            setTimeout(cleanup, DURATION + 120);
+            if (reduceMotion) { cleanup(); return; }
+            // Collapse the in-flow wrapper's reserved height to 0 → the page below
+            // glides back up together (mirror of the open animation), then remove.
+            wrapper.style.height = (wrapper.offsetHeight || bannerH) + "px";
+            bannerEl.style.transform = "translateY(-100%)";
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    wrapper.style.transition = "height " + DURATION + "ms " + EASE;
+                    wrapper.style.height = "0px";
+                });
+            });
+            wrapper.addEventListener("transitionend", function (e) { if (e.propertyName === "height") cleanup(); });
+            setTimeout(cleanup, DURATION + 150);
         }
 
         function buildElement(e) {
@@ -979,28 +990,22 @@
             try { window.addEventListener("focus", updateCartGoals); } catch (e) {}
         }
 
+        wrapper.appendChild(bannerEl);
+        // Pre-set the slide-up transform BEFORE inserting so there's no flash; the
+        // transform doesn't affect layout height, so the wrapper still reserves the
+        // bar's full height the instant it's inserted (one combined shift, no jump).
         if (!reduceMotion) {
             bannerEl.style.transform = "translateY(-100%)";
             bannerEl.style.transition = "transform " + DURATION + "ms " + EASE;
             bannerEl.style.willChange = "transform";
         }
-        wrapper.appendChild(bannerEl);
-        document.body.appendChild(wrapper);
+        document.body.insertBefore(wrapper, document.body.firstChild);
 
         bannerH = bannerEl.offsetHeight || bar.minHeight || 0;
-        origBodyPad = parseFloat((window.getComputedStyle(document.body).paddingTop) || "0") || 0;
-        if (reduceMotion) {
-            bannerEl.style.transform = "translateY(0)";
-            document.body.style.paddingTop = (origBodyPad + bannerH) + "px";
-            setHeaderOffset(bannerH);
-        } else {
+        setHeaderOffset(bannerH); // exposes --ju-banner-height for themes that offset a fixed header
+        if (!reduceMotion) {
             requestAnimationFrame(function () {
-                requestAnimationFrame(function () {
-                    bannerEl.style.transform = "translateY(0)";
-                    document.body.style.transition = "padding-top " + DURATION + "ms " + EASE;
-                    document.body.style.paddingTop = (origBodyPad + bannerH) + "px";
-                    setHeaderOffset(bannerH);
-                });
+                requestAnimationFrame(function () { bannerEl.style.transform = "translateY(0)"; });
             });
         }
     }
