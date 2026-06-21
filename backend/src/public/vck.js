@@ -868,18 +868,16 @@
         wrapper.setAttribute("aria-label", "Site announcement");
         if (meta.name) wrapper.setAttribute("data-ju-banner", meta.name);
         if (meta.id) wrapper.setAttribute("data-ju-id", meta.id);
-        // In-flow at the very top of <body> (NOT fixed): the wrapper occupies real
-        // layout height, so the header + page content sit below it and shift together
-        // exactly once — no fixed-overlay CLS, no body-padding hack, no header/body
-        // misalignment. overflow:hidden lets the bar slide into the reserved space.
-        wrapper.style.position = "relative";
-        wrapper.style.width = "100%";
-        wrapper.style.overflow = "hidden";
+        // Pinned to the very top of the viewport (stays put while scrolling).
+        wrapper.style.position = "fixed";
+        wrapper.style.top = "0"; wrapper.style.left = "0"; wrapper.style.right = "0";
+        wrapper.style.width = "100%"; wrapper.style.overflow = "hidden";
 
         var bannerEl = document.createElement("div"); bannerEl.id = "ju-banner";
         var innerEl = document.createElement("div"); innerEl.className = "jugb-inner";
 
-        var closed = false, bannerH = 0;
+        var closed = false, origBodyPad = 0, bannerH = 0;
+        var shiftedHeaders = []; // theme sticky/fixed headers we pushed below the banner (to restore on close)
         var cartGoalEls = []; // {el, cfg} for cart-value threshold messaging (updated from /cart.js)
         function updateCartGoals() {
             if (closed || !cartGoalEls.length) return;
@@ -892,7 +890,44 @@
                     }).catch(function () {});
             } catch (e) {}
         }
-        function setHeaderOffset(px) { try { document.documentElement.style.setProperty("--ju-banner-height", px + "px"); } catch (e) {} }
+        // Reusable offset variable for themes that want to consume it in CSS
+        // (e.g. header { top: var(--promo-banner-height) }). Set on both names.
+        function setBannerHeightVar(px) {
+            try {
+                document.documentElement.style.setProperty("--promo-banner-height", px + "px");
+                document.documentElement.style.setProperty("--ju-banner-height", px + "px");
+            } catch (e) {}
+        }
+
+        // The banner is position:fixed at top:0. A theme header that is itself
+        // sticky/fixed at top:0 would sit UNDER the banner. Find those top-anchored
+        // bars and push their `top` down by the banner height so they sit/stick just
+        // below the banner. Records originals so close() can restore them.
+        function offsetStickyHeaders(px) {
+            try {
+                var all = document.body.getElementsByTagName("*");
+                var vw = window.innerWidth || document.documentElement.clientWidth || 0;
+                for (var i = 0; i < all.length; i++) {
+                    var el = all[i];
+                    if (el === wrapper || wrapper.contains(el)) continue;
+                    var cs = window.getComputedStyle(el);
+                    if (cs.position !== "fixed" && cs.position !== "sticky") continue;
+                    var topVal = parseFloat(cs.top); // only bars anchored at/near the very top
+                    if (isNaN(topVal) || topVal > 2) continue;
+                    var r = el.getBoundingClientRect();
+                    if (r.width < vw * 0.6) continue;          // wide → a header/announcement bar, not a small widget
+                    if (r.height > (window.innerHeight || 800) * 0.5) continue; // skip full-screen overlays
+                    shiftedHeaders.push({ el: el, top: el.style.top });
+                    el.style.top = px + "px";
+                }
+            } catch (e) {}
+        }
+        function restoreStickyHeaders() {
+            for (var i = 0; i < shiftedHeaders.length; i++) {
+                try { shiftedHeaders[i].el.style.top = shiftedHeaders[i].top; } catch (e) {}
+            }
+            shiftedHeaders = [];
+        }
         function doClose() {
             if (closed) return; closed = true;
             for (var i = 0; i < timers.length; i++) clearInterval(timers[i]);
@@ -900,21 +935,17 @@
                 STORAGE.session.setItem("banner_closed_" + meta.id, "1");
                 try { window.localStorage.setItem("ju_dismissed_" + meta.id, "1"); } catch (e) {}
             }
-            setHeaderOffset(0);
+            setBannerHeightVar(0);
+            restoreStickyHeaders();                   // put theme headers back to their original top
+            var bs = document.body.style;
             var done = false;
             function cleanup() { if (done) return; done = true; wrapper.remove(); styleEl.remove(); }
-            if (reduceMotion) { cleanup(); return; }
-            // Collapse the in-flow wrapper's reserved height to 0 → the page below
-            // glides back up together (mirror of the open animation), then remove.
-            wrapper.style.height = (wrapper.offsetHeight || bannerH) + "px";
+            if (reduceMotion) { bs.paddingTop = origBodyPad + "px"; cleanup(); return; }
+            // Smoothly remove the reserved space (page glides back up) + slide the bar away.
+            bs.transition = "padding-top " + DURATION + "ms " + EASE;
+            bs.paddingTop = origBodyPad + "px";
             bannerEl.style.transform = "translateY(-100%)";
-            requestAnimationFrame(function () {
-                requestAnimationFrame(function () {
-                    wrapper.style.transition = "height " + DURATION + "ms " + EASE;
-                    wrapper.style.height = "0px";
-                });
-            });
-            wrapper.addEventListener("transitionend", function (e) { if (e.propertyName === "height") cleanup(); });
+            bannerEl.addEventListener("transitionend", function (e) { if (e.propertyName === "transform") cleanup(); });
             setTimeout(cleanup, DURATION + 150);
         }
 
@@ -991,21 +1022,30 @@
         }
 
         wrapper.appendChild(bannerEl);
-        // Pre-set the slide-up transform BEFORE inserting so there's no flash; the
-        // transform doesn't affect layout height, so the wrapper still reserves the
-        // bar's full height the instant it's inserted (one combined shift, no jump).
+        // Pre-set the slide-up transform BEFORE attaching so the bar slides in (no flash).
         if (!reduceMotion) {
             bannerEl.style.transform = "translateY(-100%)";
             bannerEl.style.transition = "transform " + DURATION + "ms " + EASE;
             bannerEl.style.willChange = "transform";
         }
-        document.body.insertBefore(wrapper, document.body.firstChild);
+        document.body.appendChild(wrapper);
 
+        // ---- Reserve space so the FIXED banner pushes the page down (no overlay) ----
         bannerH = bannerEl.offsetHeight || bar.minHeight || 0;
-        setHeaderOffset(bannerH); // exposes --ju-banner-height for themes that offset a fixed header
-        if (!reduceMotion) {
+        origBodyPad = parseFloat(window.getComputedStyle(document.body).paddingTop || "0") || 0;
+        setBannerHeightVar(bannerH);                 // exposes --promo-banner-height / --ju-banner-height
+        offsetStickyHeaders(bannerH);                // push sticky/fixed theme headers below the banner
+
+        if (reduceMotion) {
+            bannerEl.style.transform = "translateY(0)";
+            document.body.style.paddingTop = (origBodyPad + bannerH) + "px";
+        } else {
             requestAnimationFrame(function () {
-                requestAnimationFrame(function () { bannerEl.style.transform = "translateY(0)"; });
+                requestAnimationFrame(function () {
+                    bannerEl.style.transform = "translateY(0)";
+                    document.body.style.transition = "padding-top " + DURATION + "ms " + EASE;
+                    document.body.style.paddingTop = (origBodyPad + bannerH) + "px";
+                });
             });
         }
     }
