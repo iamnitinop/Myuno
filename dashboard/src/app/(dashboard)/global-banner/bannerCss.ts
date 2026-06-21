@@ -168,6 +168,10 @@ function emitElement(e: any, css: string[], device: GBDevice, scope: string) {
     else if (isGroup) {
         r2 += `display:flex;flex-direction:${s.direction || "row"};justify-content:${jc(s.justify)};align-items:${s.align || "center"};gap:${s.gap ?? 12}px;`;
         if (s.wrap) r2 += "flex-wrap:wrap;";
+    } else if (e.type === "cartGoal") {
+        // block (not column-flex) so the message text + amount spans flow as ONE inline line.
+        // A flex container would turn each text-run/span into a separate item and stack them.
+        r2 += `display:block;text-align:${s.textAlign || "center"};`;
     } else {
         r2 += "display:flex;flex-direction:column;justify-content:center;align-items:center;";
     }

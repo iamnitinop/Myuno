@@ -767,6 +767,9 @@
         else if (isGroup) {
             er += "display:flex;flex-direction:" + (s.direction || "row") + ";justify-content:" + jugbJustify(s.justify) + ";align-items:" + (s.align || "center") + ";gap:" + (s.gap != null ? s.gap : 12) + "px;";
             if (s.wrap) er += "flex-wrap:wrap;";
+        } else if (e.type === "cartGoal") {
+            // block (not column-flex) so the message text + amount spans flow as ONE inline line.
+            er += "display:block;text-align:" + (s.textAlign || "center") + ";";
         } else {
             er += "display:flex;flex-direction:column;justify-content:center;align-items:center;";
         }
