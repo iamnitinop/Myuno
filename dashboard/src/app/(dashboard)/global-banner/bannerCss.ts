@@ -19,6 +19,12 @@ export const TZ_OPTIONS: { value: string; label: string }[] = [
     { value: "Australia/Sydney", label: "AET (Sydney)" },
 ];
 
+// Does this element subtree contain a close button? (close is absolutely positioned at the
+// banner's top-right, so its space must be reserved symmetrically to keep content centered.)
+export function anyClose(els: any[]): boolean {
+    return (els || []).some((e) => e.type === "close" || anyClose(e.children));
+}
+
 // Own-bucket visibility (NOT inherited): true only if THIS device's bucket sets hidden.
 // Each device's CSS re-emits display, so the @media cascade makes visibility independent.
 export function ownHidden(r: any, device: GBDevice): boolean {
@@ -115,7 +121,10 @@ export function deviceRules(layout: GlobalBannerLayout, device: GBDevice, scope:
     css.push(`${scope} .jugb-inner{display:flex;flex-direction:${innerDir};align-items:${bar.align || "center"};justify-content:${innerJustify};gap:${innerGap}px;width:100%;box-sizing:border-box;}`);
 
     const contentMax = bar.maxWidth || 0;            // 0 => no cap (content also full width)
-    const gutterL = padX, gutterR = Math.max(padX, 40); // default right gutter reserves room for the close button
+    // Symmetric horizontal gutter so centered content stays visually centered. Widen it
+    // (still on BOTH sides) only when a close button exists, so the top-right close never overlaps.
+    const gutterX = anyClose(layout.containers ? layout.containers.flatMap((c) => c.elements || []) : []) ? Math.max(padX, 40) : padX;
+    const gutterL = gutterX, gutterR = gutterX;
 
     (layout.containers || []).forEach((c) => {
         const cs: any = resolve(c.responsive, device);

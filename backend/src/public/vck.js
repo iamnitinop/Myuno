@@ -647,6 +647,9 @@
     function jugbJustify(v) { return v === "left" ? "flex-start" : v === "right" ? "flex-end" : (v || "center"); }
     function jugbN(v, d) { return v == null ? (d || 0) : v; }
     function jugbOwnHidden(r, device) { return !!(r && r[device] && r[device].hidden); }
+    // Does this element subtree contain a close button? (close sits absolute at the banner's
+    // top-right, so reserve its space symmetrically to keep centered content centered.)
+    function jugbAnyClose(els) { return (els || []).some(function (e) { return e.type === "close" || jugbAnyClose(e.children); }); }
     function jugbPad(s, def) {
         def = def || {};
         var t = jugbN(s.padTop, jugbN(s.paddingY, jugbN(def.t, 0)));
@@ -725,7 +728,12 @@
         var innerJustify = innerDir === "column" ? "flex-start" : "center";
         css.push(scope + " .jugb-inner{display:flex;flex-direction:" + innerDir + ";align-items:" + (bar.align || "center") + ";justify-content:" + innerJustify + ";gap:" + innerGap + "px;width:100%;box-sizing:border-box;}");
         var contentMax = bar.maxWidth || 0;
-        var gutterL = padX, gutterR = Math.max(padX, 40);
+        // Symmetric gutter so centered content stays centered; widen both sides only when a
+        // close button exists so the top-right close never overlaps.
+        var allEls = [];
+        (layout.containers || []).forEach(function (c) { allEls = allEls.concat(c.elements || []); });
+        var gutterX = jugbAnyClose(allEls) ? Math.max(padX, 40) : padX;
+        var gutterL = gutterX, gutterR = gutterX;
         (layout.containers || []).forEach(function (c) {
             var cs = jugbResolve(c.responsive, device);
             var csel = scope + ' [data-cid="' + c.id + '"]';
