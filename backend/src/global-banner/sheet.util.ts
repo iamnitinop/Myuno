@@ -204,8 +204,10 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 
 function ttlMs(): number {
-    const secs = Number(process.env.GLOBAL_BANNER_CACHE_SECONDS || 60);
-    return (isNaN(secs) ? 60 : secs) * 1000;
+    // Short by default so sheet edits reflect on live pages within seconds. Override with
+    // GLOBAL_BANNER_CACHE_SECONDS (e.g. set to 2-3 during a live sale, or higher to save cost).
+    const secs = Number(process.env.GLOBAL_BANNER_CACHE_SECONDS || 10);
+    return (isNaN(secs) ? 10 : secs) * 1000;
 }
 
 /**

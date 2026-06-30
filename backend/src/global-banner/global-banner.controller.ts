@@ -20,9 +20,9 @@ export class GlobalBannerController {
         @Res() res: Response,
     ) {
         const data = await this.svc.runtimeCandidates(accountId, handle || '');
-        // Short browser cache so dashboard edits (layout, targeting, enable/disable)
-        // propagate quickly. Sheet content is separately cached server-side.
-        res.setHeader('Cache-Control', 'public, max-age=30');
+        // Very short browser cache so sheet/layout/targeting edits propagate to live
+        // pages almost immediately, while still absorbing rapid repeat loads by one visitor.
+        res.setHeader('Cache-Control', 'public, max-age=5');
         res.setHeader('Access-Control-Allow-Origin', '*');
         return res.json(data);
     }
