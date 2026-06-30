@@ -791,7 +791,7 @@
         if (s.fontWeight) er += "font-weight:" + s.fontWeight + ";";
         if (s.fontStyle) er += "font-style:" + s.fontStyle + ";";
         if (s.lineHeight) er += "line-height:" + s.lineHeight + ";";
-        if (s.fontFamily) er += "font-family:" + s.fontFamily + ";";
+        if (s.fontFamily) er += 'font-family:"' + s.fontFamily + '", sans-serif;';
         // Per-element background box (any element type), independent of the banner/container bg.
         if (e.type !== "close" && (s.bgType || s.background)) er += "background:" + jugbBg(s) + ";";
         if (e.type !== "close" && s.boxRadius) er += "border-radius:" + s.boxRadius + "px;" + (s.bgType === "image" ? "overflow:hidden;" : "");
@@ -839,6 +839,35 @@
             + "@media (max-width:767px){" + jugbDeviceRules(layout, "mobile", scope) + "}";
     }
 
+    // Collect every font-family used in the layout (all breakpoints + nested groups). Mirrors bannerCss.collectFonts.
+    function jugbCollectFonts(layout) {
+        var set = {};
+        function addResp(r) {
+            if (!r) return;
+            [r.desktop, r.tablet, r.mobile].forEach(function (s) { if (s && s.fontFamily) set[String(s.fontFamily).trim()] = 1; });
+        }
+        function visitEl(e) { addResp(e.responsive); (e.children || []).forEach(visitEl); }
+        (layout.containers || []).forEach(function (c) { (c.elements || []).forEach(visitEl); });
+        return Object.keys(set).filter(Boolean);
+    }
+    // Google Fonts v1 URL (lenient: a font's missing weights are ignored). Mirrors bannerCss.googleFontsUrl.
+    function jugbGoogleFontsUrl(families) {
+        if (!families || !families.length) return "";
+        var fam = families.map(function (f) { return f.replace(/ /g, "+") + ":300,400,500,600,700,800"; }).join("|");
+        return "https://fonts.googleapis.com/css?family=" + fam + "&display=swap";
+    }
+    // Inject a single <link> so the banner's Google fonts load on the storefront (CSP-safe: falls back to system font if blocked).
+    function jugbLoadFonts(layout) {
+        try {
+            var href = jugbGoogleFontsUrl(jugbCollectFonts(layout));
+            if (!href) return;
+            var id = "ju-gfonts";
+            var link = document.getElementById(id);
+            if (!link) { link = document.createElement("link"); link.id = id; link.rel = "stylesheet"; document.head.appendChild(link); }
+            if (link.href !== href) link.href = href;
+        } catch (e) {}
+    }
+
     function jugbFormatCountdown(ms, mode) {
         if (ms < 0) ms = 0;
         var s = Math.floor((ms % 60000) / 1000), m = Math.floor((ms % 3600000) / 60000);
@@ -884,6 +913,7 @@
         var styleEl = document.createElement("style");
         styleEl.innerHTML = "#ju-wrapper{z-index:2147483647;}" + jugbBuildCss(layout, "#ju-banner");
         document.head.appendChild(styleEl);
+        jugbLoadFonts(layout); // load any Google fonts used by the banner (no-op/system fallback if none or CSP blocks)
 
         // ---- DOM ----
         var wrapper = document.createElement("div");

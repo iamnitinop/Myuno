@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GlobalBannerLayout, GBElement } from "@/lib/types";
-import { buildBannerCss, formatCountdown, countdownHtml, formatInTz, buildHtmlSrcdoc, cartGoalMessage } from "./bannerCss";
+import { buildBannerCss, formatCountdown, countdownHtml, formatInTz, buildHtmlSrcdoc, cartGoalMessage, collectFonts, ensureGoogleFonts } from "./bannerCss";
 
 /**
  * Pure-CSS preview: renders the SAME DOM tree as the live embed and styles it with
@@ -25,6 +25,9 @@ export function GlobalBannerPreview({
 }) {
     const scopeId = "jugbprev";
     const css = useMemo(() => buildBannerCss(layout, { scope: "#" + scopeId, mode: "preview", device }), [layout, device]);
+
+    // Load any Google fonts used in the layout so the preview renders the real typeface.
+    useEffect(() => { ensureGoogleFonts(collectFonts(layout), "jugb-fonts-preview"); }, [layout]);
 
     // tick so timer elements count down live in the preview
     const [, setTick] = useState(0);

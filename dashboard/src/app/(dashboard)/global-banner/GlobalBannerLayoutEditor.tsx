@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, DragOverlay } from "@dnd-kit/core";
 import { GlobalBannerLayout, GBFlexContainer, GBElement, GBElementType, GBDevice } from "@/lib/types";
 import { uid } from "@/lib/utils";
 import { previewGlobalBanner } from "@/lib/api";
 import { GlobalBannerPreview } from "./GlobalBannerPreview";
-import { resolve, istWallToInstant, formatInTz, TZ_OPTIONS } from "./bannerCss";
+import { resolve, istWallToInstant, formatInTz, TZ_OPTIONS, ensureGoogleFonts } from "./bannerCss";
+import { GOOGLE_FONTS } from "@/lib/googleFonts";
 import { Pill } from "@/components/ui/Pill";
 import { Loader2, Search, Plus, Trash2, ChevronUp, ChevronDown, GripVertical, Type, Image as ImageIcon, FileText, MousePointerClick, Ticket, Clock, X, Columns, Eye, EyeOff, Code2, Gift } from "lucide-react";
 
@@ -26,6 +27,52 @@ function ColorIn({ value, onChange }: { value?: string; onChange: (v: string) =>
 function SelIn({ value, onChange, options }: { value?: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
     return <select className={inputCls} value={value || ""} onChange={(e) => onChange(e.target.value)}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>;
 }
+// Searchable Google Fonts picker (full library). Each row previews in its own typeface;
+// only the visible (filtered) options are loaded, so the picker stays light.
+function FontPicker({ value, onChange }: { value?: string; onChange: (v?: string) => void }) {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState("");
+    const results = useMemo(() => {
+        const s = q.trim().toLowerCase();
+        const base = s ? GOOGLE_FONTS.filter((f) => f.f.toLowerCase().includes(s)) : GOOGLE_FONTS;
+        return base.slice(0, 60);
+    }, [q]);
+    useEffect(() => {
+        if (!open) return;
+        const t = setTimeout(() => {
+            const fams = results.map((r) => r.f);
+            if (value) fams.push(value);
+            ensureGoogleFonts(fams, "jugb-fontpicker-preview");
+        }, 200); // debounce so typing in search doesn't spam font requests
+        return () => clearTimeout(t);
+    }, [open, results, value]);
+    return (
+        <div className="relative">
+            <button type="button" onClick={() => setOpen((o) => !o)} style={{ fontFamily: value ? `"${value}", sans-serif` : undefined }}
+                className={inputCls + " flex items-center justify-between text-left"}>
+                <span className="truncate">{value || "Default (theme font)"}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            </button>
+            {open && (<>
+                <div className="fixed inset-0 z-20" onClick={() => { setOpen(false); setQ(""); }} />
+                <div className="absolute z-30 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                    <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search 1,900+ Google fonts…"
+                        className="w-full text-sm px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 bg-transparent outline-none" />
+                    <div className="max-h-56 overflow-auto">
+                        <button type="button" onClick={() => { onChange(undefined); setOpen(false); setQ(""); }}
+                            className="block w-full text-left px-2 py-1.5 text-sm text-gray-500 hover:bg-blue-50 dark:hover:bg-blue-900/20">Default (theme font)</button>
+                        {results.map((r) => (
+                            <button key={r.f} type="button" onClick={() => { onChange(r.f); setOpen(false); setQ(""); }} style={{ fontFamily: `"${r.f}", ${r.c}` }}
+                                className={`block w-full text-left px-2 py-1.5 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 ${value === r.f ? "bg-blue-50 dark:bg-blue-900/20 font-semibold" : ""}`}>{r.f}</button>
+                        ))}
+                        {!results.length && <div className="px-2 py-2 text-xs text-gray-400">No font matches “{q}”.</div>}
+                    </div>
+                </div>
+            </>)}
+        </div>
+    );
+}
+
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
     return <div className="flex items-center justify-between"><span className="text-xs font-medium text-gray-600 dark:text-gray-300">{label}</span>
         <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`}>
@@ -492,6 +539,7 @@ export function GlobalBannerLayoutEditor({ layout, onChange, id, sheetUrl }: { l
 function ElementProps({ el, r, setStyle, setEl, perDevice }: { el: GBElement; r: any; setStyle: (p: any) => void; setEl: (p: any) => void; perDevice?: { resp: any; setDev: (dev: GBDevice, patch: any) => void } }) {
     const typography = (
         <>
+            <Field label="Font"><FontPicker value={r.fontFamily} onChange={(v) => setStyle({ fontFamily: v })} /></Field>
             <Field label="Color"><ColorIn value={r.color} onChange={(v) => setStyle({ color: v })} /></Field>
             <div className="grid grid-cols-2 gap-2">
                 <Field label="Font size"><NumIn value={r.fontSize} onChange={(v: number) => setStyle({ fontSize: v })} /></Field>
@@ -628,6 +676,7 @@ function TimerProps({ el, r, setStyle, setEl }: { el: GBElement; r: any; setStyl
             <Toggle label="Show labels (days/hrs…)" checked={t.showLabels !== false} onChange={(v) => setTimer({ showLabels: v })} />
             <Field label="When it hits 0"><SelIn value={t.onExpire || "hide"} onChange={(v) => setTimer({ onExpire: v })} options={[{ value: "hide", label: "Hide timer" }, { value: "stop", label: "Freeze at 00" }]} /></Field>
             <div className="mt-1 pt-2 border-t border-gray-200 dark:border-gray-700 text-[11px] font-bold uppercase tracking-wide text-gray-500">Style (this breakpoint)</div>
+            <Field label="Font"><FontPicker value={r.fontFamily} onChange={(v) => setStyle({ fontFamily: v })} /></Field>
             <div className="grid grid-cols-2 gap-2">
                 <Field label="Digit color"><ColorIn value={r.color} onChange={(v) => setStyle({ color: v })} /></Field>
                 <Field label="Box color"><ColorIn value={r.boxColor} onChange={(v) => setStyle({ boxColor: v })} /></Field>
@@ -657,6 +706,7 @@ function CartGoalProps({ el, r, setStyle, setEl }: { el: GBElement; r: any; setS
             <div className="mt-1 pt-2 border-t border-gray-200 dark:border-gray-700 text-[11px] font-bold uppercase tracking-wide text-gray-500">Text style (this breakpoint)</div>
             <Toggle label="Force onto one line (clip instead of wrapping)" checked={!!cg.noWrap} onChange={(v) => setCG({ noWrap: v })} />
             <div className="text-[10px] text-gray-400 -mt-1">Off (default): stays on one line when it fits, wraps to more lines (and grows the banner) on narrow screens.</div>
+            <Field label="Font"><FontPicker value={r.fontFamily} onChange={(v) => setStyle({ fontFamily: v })} /></Field>
             <Field label="Text color (whole message)"><ColorIn value={r.color} onChange={(v) => setStyle({ color: v })} /></Field>
             <div className="grid grid-cols-2 gap-2">
                 <Field label="Font size"><NumIn value={r.fontSize} onChange={(v: number) => setStyle({ fontSize: v })} /></Field>

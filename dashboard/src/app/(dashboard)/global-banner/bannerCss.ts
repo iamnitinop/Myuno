@@ -102,6 +102,34 @@ export function composeBackground(s: any, fallback?: string): string {
     return s.background || fallback || "";
 }
 
+// ---- Google Fonts (shared by preview + live; mirrored in vck.js) ----
+// Collect every font-family used anywhere in the layout (all breakpoints + nested groups).
+export function collectFonts(layout: GlobalBannerLayout): string[] {
+    const set = new Set<string>();
+    const addResp = (r: any) => {
+        if (!r) return;
+        [r.desktop, r.tablet, r.mobile].forEach((s) => { if (s && s.fontFamily) set.add(String(s.fontFamily).trim()); });
+    };
+    const visitEl = (e: any) => { addResp(e.responsive); (e.children || []).forEach(visitEl); };
+    (layout.containers || []).forEach((c) => (c.elements || []).forEach(visitEl));
+    return Array.from(set).filter(Boolean);
+}
+// Build a Google Fonts v1 stylesheet URL (lenient: weights a font lacks are ignored, never 4xx).
+export function googleFontsUrl(families: string[]): string {
+    if (!families || !families.length) return "";
+    const fam = families.map((f) => f.replace(/ /g, "+") + ":300,400,500,600,700,800").join("|");
+    return "https://fonts.googleapis.com/css?family=" + fam + "&display=swap";
+}
+// Inject/update a single <link> so the given families are loaded (browser-only; safe no-op on server).
+export function ensureGoogleFonts(families: string[], linkId: string): void {
+    if (typeof document === "undefined") return;
+    const href = googleFontsUrl(families);
+    let link = document.getElementById(linkId) as HTMLLinkElement | null;
+    if (!href) { if (link) link.remove(); return; }
+    if (!link) { link = document.createElement("link"); link.id = linkId; link.rel = "stylesheet"; document.head.appendChild(link); }
+    if (link.href !== href) link.href = href;
+}
+
 // All CSS rules for ONE device, scoped under `scope` (e.g. "#ju-banner").
 export function deviceRules(layout: GlobalBannerLayout, device: GBDevice, scope: string): string {
     const css: string[] = [];
@@ -194,7 +222,7 @@ function emitElement(e: any, css: string[], device: GBDevice, scope: string) {
     if (s.fontWeight) r2 += `font-weight:${s.fontWeight};`;
     if (s.fontStyle) r2 += `font-style:${s.fontStyle};`;
     if (s.lineHeight) r2 += `line-height:${s.lineHeight};`;
-    if (s.fontFamily) r2 += `font-family:${s.fontFamily};`;
+    if (s.fontFamily) r2 += `font-family:"${s.fontFamily}", sans-serif;`;
     // Per-element background box (any element type), independent of the banner/container bg.
     if (e.type !== "close" && (s.bgType || s.background)) r2 += `background:${composeBackground(s)};`;
     if (e.type !== "close" && s.boxRadius) r2 += `border-radius:${s.boxRadius}px;${s.bgType === "image" ? "overflow:hidden;" : ""}`;
